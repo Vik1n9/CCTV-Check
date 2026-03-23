@@ -6,9 +6,7 @@
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
   <meta name="theme-color" content="#161b22">
-  <title>CCTV 點檢系統 | 異常記錄管理</title>
-  <link rel="preconnect" href="https://fonts.googleapis.com">
-  <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;600;700&family=Outfit:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <title>CCTV 點檢系統 | 動態主機 + 報表導入 (支援主機修復)</title>
   <style>
     :root {
       --bg:        #0d1117;
@@ -23,942 +21,511 @@
       --abnormal:  #e67e22;
       --removed:   #6e7681;
       --radius:    16px;
-      /* 安全區域 */
       --safe-top:    env(safe-area-inset-top, 0px);
       --safe-bottom: env(safe-area-inset-bottom, 0px);
     }
 
-    /* === 基礎重置 === */
-    *, *::before, *::after {
-      box-sizing: border-box;
-      -webkit-tap-highlight-color: transparent;
-      margin: 0; padding: 0;
-    }
-
-    html {
-      overflow-x: hidden;
-      overscroll-behavior: none;
-    }
-
+    *, *::before, *::after { box-sizing: border-box; -webkit-tap-highlight-color: transparent; margin: 0; padding: 0; }
+    html { overflow-x: hidden; overscroll-behavior: none; }
     body {
       font-family: 'Outfit', system-ui, sans-serif;
       background: var(--bg);
       color: var(--text);
       min-height: 100dvh;
-      /* 底部留空：固定 bottom-bar 高度 + 安全區域 */
       padding-bottom: calc(80px + var(--safe-bottom) + 8px);
       overflow-x: hidden;
       overscroll-behavior-y: contain;
-      -webkit-text-size-adjust: 100%; /* 防止iOS旋轉時自動縮放字體 */
     }
 
-    /* === Header === */
-    .header {
-      background: var(--surface);
-      border-bottom: 1px solid var(--border);
-      padding: 12px 16px;
-      padding-top: max(12px, var(--safe-top));
-      position: sticky; top: 0; z-index: 100;
-      display: flex; justify-content: space-between; align-items: center;
-    }
-    .header-logo {
-      font-size: 1rem; font-weight: 800; letter-spacing: 0.04em;
-      display: flex; align-items: center; gap: 8px;
-    }
-    .header-logo .dot {
-      width: 10px; height: 10px; border-radius: 50%;
-      background: var(--fault);
-      animation: pulse 1.8s ease-in-out infinite;
-      flex-shrink: 0;
-    }
+    .header { background: var(--surface); border-bottom: 1px solid var(--border); padding: 12px 16px; padding-top: max(12px, var(--safe-top)); position: sticky; top: 0; z-index: 100; display: flex; justify-content: space-between; align-items: center; }
+    .header-logo { font-size: 1rem; font-weight: 800; display: flex; align-items: center; gap: 8px; }
+    .header-logo .dot { width: 10px; height: 10px; border-radius: 50%; background: var(--fault); animation: pulse 1.8s ease-in-out infinite; }
     @keyframes pulse { 0%,100%{opacity:1;transform:scale(1)} 50%{opacity:.5;transform:scale(1.3)} }
-    .header-date {
-      font-family: 'JetBrains Mono', monospace;
-      font-size: 0.7rem; color: var(--muted);
-      text-align: right;
-    }
-
-    /* === Tab Bar === */
-    .tab-bar {
-      display: flex;
-      background: var(--surface); border-bottom: 1px solid var(--border);
-      position: sticky;
-      /* 緊接在 header 下方 sticky */
-      top: calc(44px + max(12px, var(--safe-top)));
-      z-index: 99;
-    }
-    .tab {
-      flex: 1; text-align: center;
-      padding: 0 0; height: 48px;  /* 固定高度 = 明確觸控目標 */
-      display: flex; align-items: center; justify-content: center;
-      font-weight: 700; font-size: 0.9rem;
-      cursor: pointer; color: var(--muted);
-      border-bottom: 2.5px solid transparent;
-      transition: all .2s; user-select: none;
-    }
+    .header-date { font-family: 'JetBrains Mono', monospace; font-size: 0.7rem; color: var(--muted); }
+    .tab-bar { display: flex; background: var(--surface); border-bottom: 1px solid var(--border); position: sticky; top: calc(44px + max(12px, var(--safe-top))); z-index: 99; }
+    .tab { flex: 1; text-align: center; height: 48px; display: flex; align-items: center; justify-content: center; font-weight: 700; font-size: 0.9rem; cursor: pointer; color: var(--muted); border-bottom: 2.5px solid transparent; transition: all .2s; user-select: none; }
     .tab.active { color: var(--primary); border-color: var(--primary); }
-
-    /* === 主內容區 === */
     .content { padding: 12px 12px 0; max-width: 820px; margin: 0 auto; }
-
-    /* === 主機導覽 === */
-    .host-nav {
-      background: var(--surface);
-      border: 1px solid var(--border);
-      border-radius: var(--radius);
-      padding: 12px 12px 10px;
-      margin-bottom: 10px;
-    }
+    .host-nav { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); padding: 12px; margin-bottom: 10px; }
     .host-nav-row { display: flex; align-items: center; gap: 8px; margin-bottom: 12px; }
-
-    /* 導覽按鈕：明確 44×44 觸控目標 */
-    .nav-btn {
-      width: 48px; height: 48px; flex-shrink: 0;
-      background: var(--surface2); border: 1px solid var(--border);
-      border-radius: 12px; color: var(--text);
-      font-size: 1.1rem; cursor: pointer;
-      display: flex; align-items: center; justify-content: center;
-      transition: background .15s, transform .1s;
-      font-family: inherit;
-      /* 擴大觸控範圍 */
-      touch-action: manipulation;
-    }
+    .nav-btn { width: 48px; height: 48px; flex-shrink: 0; background: var(--surface2); border: 1px solid var(--border); border-radius: 12px; color: var(--text); font-size: 1.1rem; cursor: pointer; display: flex; align-items: center; justify-content: center; transition: background .15s, transform .1s; touch-action: manipulation; }
     .nav-btn:active { background: var(--border); transform: scale(0.9); }
-
-    .host-info { flex: 1; text-align: center; min-width: 0; }
-    .host-name {
-      font-size: clamp(1.3rem, 6vw, 1.7rem);
-      font-weight: 800;
-      font-family: 'JetBrains Mono', monospace;
-      letter-spacing: 0.06em; line-height: 1;
-    }
+    .host-info { flex: 1; text-align: center; }
+    .host-name { font-size: clamp(1.3rem, 6vw, 1.7rem); font-weight: 800; font-family: 'JetBrains Mono', monospace; }
     .host-meta { font-size: 0.72rem; color: var(--muted); margin-top: 3px; }
-
-    /* === 主機指示點 — 增加觸控面積 === */
-    .host-dots {
-      display: flex; gap: 6px; justify-content: center;
-      flex-wrap: wrap;
-      /* 讓每個 dot 有更大的點擊面積 */
-      padding: 4px 0;
-    }
-    .host-dot {
-      width: 10px; height: 10px; border-radius: 5px;
-      background: var(--border); cursor: pointer;
-      transition: all .15s;
-      /* 擴大觸控範圍而不影響視覺大小 */
-      padding: 8px;
-      background-clip: content-box;
-      -webkit-background-clip: content-box;
-      margin: -8px;
-      position: relative;
-    }
-    .host-dot.current   { width: 24px; padding: 8px; border-radius: 12px; background: var(--primary); }
+    .host-dots { display: flex; gap: 6px; justify-content: center; flex-wrap: wrap; padding: 4px 0; }
+    .host-dot { width: 10px; height: 10px; border-radius: 5px; background: var(--border); cursor: pointer; transition: all .15s; padding: 8px; background-clip: content-box; margin: -8px; position: relative; }
+    .host-dot.current { width: 24px; padding: 8px; border-radius: 12px; background: var(--primary); }
     .host-dot.has-fault { background: var(--fault); }
     .host-dot.has-abnormal:not(.has-fault) { background: var(--abnormal); }
-    .host-dot.removed   { background: var(--removed); cursor: default; opacity: 0.5; }
-    .host-dot.all-ok    { background: var(--normal); }
-
-    /* === 統計條 === */
+    .host-dot.removed { background: var(--removed); cursor: default; opacity: 0.5; }
+    .host-dot.all-ok { background: var(--normal); }
     .stats-strip { display: grid; grid-template-columns: repeat(3,1fr); gap: 8px; margin-bottom: 10px; }
-    .stat-card {
-      background: var(--surface); border: 1px solid var(--border);
-      border-radius: 14px; padding: 12px 6px; text-align: center;
-    }
-    .stat-num {
-      font-size: clamp(1.4rem, 5vw, 1.9rem);
-      font-weight: 800;
-      font-family: 'JetBrains Mono', monospace; line-height: 1;
-    }
+    .stat-card { background: var(--surface); border: 1px solid var(--border); border-radius: 14px; padding: 12px 6px; text-align: center; }
+    .stat-num { font-size: clamp(1.4rem, 5vw, 1.9rem); font-weight: 800; font-family: 'JetBrains Mono', monospace; }
     .stat-label { font-size: clamp(0.62rem, 2.2vw, 0.7rem); color: var(--muted); margin-top: 4px; }
-    .stat-card.s-normal   .stat-num { color: var(--normal); }
-    .stat-card.s-fault    .stat-num { color: var(--fault); }
-    .stat-card.s-abnormal .stat-num { color: var(--abnormal); }
-
-    /* === 篩選列 — 確保觸控目標高度 >= 40px === */
     .filter-row { display: flex; gap: 6px; margin-bottom: 10px; flex-wrap: wrap; }
-    .filter-btn {
-      flex: 1; min-width: 60px;
-      padding: 0 4px; height: 42px;
-      border-radius: 10px; border: 1px solid var(--border);
-      background: var(--surface); font-size: 0.78rem; font-weight: 600;
-      color: var(--muted); cursor: pointer; text-align: center;
-      transition: all .15s; font-family: inherit;
-      display: flex; align-items: center; justify-content: center;
-      touch-action: manipulation;
-    }
+    .filter-btn { flex: 1; min-width: 60px; height: 42px; border-radius: 10px; border: 1px solid var(--border); background: var(--surface); font-size: 0.78rem; font-weight: 600; color: var(--muted); cursor: pointer; display: flex; align-items: center; justify-content: center; touch-action: manipulation; }
     .filter-btn.active { border-color: var(--primary); color: var(--primary); background: rgba(31,111,235,.12); }
-    .filter-btn:active { transform: scale(0.95); }
-
-    /* === 圖例 === */
-    .legend {
-      display: flex; gap: 12px; justify-content: center;
-      margin-bottom: 10px; flex-wrap: wrap;
-    }
+    .legend { display: flex; gap: 12px; justify-content: center; margin-bottom: 10px; flex-wrap: wrap; }
     .legend-item { display: flex; align-items: center; gap: 5px; font-size: 0.75rem; color: var(--muted); }
-    .legend-dot { width: 10px; height: 10px; border-radius: 50%; flex-shrink: 0; }
-
-    /* 滑動提示 */
-    .swipe-hint {
-      text-align: center;
-      font-size: 0.65rem;
-      color: var(--border);
-      margin-bottom: 6px;
-      letter-spacing: 0.06em;
-    }
-
-    /* === 頻道網格 === */
-    .ch-grid {
-      background: var(--surface); border: 1px solid var(--border);
-      border-radius: var(--radius); padding: 10px;
-      margin-bottom: 10px;
-      min-height: 180px;
-      /* 禁止文字選取 */
-      user-select: none;
-      -webkit-user-select: none;
-    }
-    .grid-normal {
-      display: grid;
-      grid-template-columns: repeat(auto-fill, minmax(54px, 1fr));
-      gap: 6px;
-    }
-    .ch-card {
-      aspect-ratio: 1;
-      min-height: 44px; /* 確保觸控目標 */
-      border-radius: 12px;
-      display: flex; flex-direction: column;
-      align-items: center; justify-content: center;
-      font-weight: 700;
-      font-size: clamp(0.75rem, 2.8vw, 0.92rem);
-      font-family: 'JetBrains Mono', monospace;
-      color: white; cursor: pointer;
-      user-select: none; touch-action: manipulation;
-      transition: transform .08s ease;
-      position: relative; overflow: hidden;
-    }
+    .legend-dot { width: 10px; height: 10px; border-radius: 50%; }
+    .swipe-hint { text-align: center; font-size: 0.65rem; color: var(--border); margin-bottom: 6px; }
+    .ch-grid { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); padding: 10px; margin-bottom: 10px; min-height: 180px; user-select: none; }
+    .grid-normal { display: grid; grid-template-columns: repeat(auto-fill, minmax(54px, 1fr)); gap: 6px; }
+    .ch-card { aspect-ratio: 1; min-height: 44px; border-radius: 12px; display: flex; align-items: center; justify-content: center; font-weight: 700; font-size: clamp(0.75rem, 2.8vw, 0.92rem); font-family: 'JetBrains Mono', monospace; color: white; cursor: pointer; transition: transform .08s; position: relative; }
     .ch-card[data-state="0"] { background: var(--normal); }
     .ch-card[data-state="1"] { background: var(--fault); }
     .ch-card[data-state="2"] { background: var(--abnormal); }
     .ch-card.hidden { display: none; }
     .ch-card:active { transform: scale(0.84); }
-    .ch-card[data-state="1"]::before {
-      content: '';
-      position: absolute; inset: 0;
-      background: linear-gradient(135deg, rgba(255,255,255,.15) 0%, transparent 60%);
-      pointer-events: none;
-    }
-
-    .removed-message {
-      text-align: center; padding: 40px 20px;
-      color: var(--muted); font-size: 0.9rem;
-      background: var(--surface2); border-radius: 12px;
-      border: 1px dashed var(--border);
-    }
-
-    /* === 快速操作區 === */
-    .section-label {
-      font-size: 0.68rem; font-weight: 700;
-      text-transform: uppercase; letter-spacing: .1em;
-      color: var(--muted); margin-bottom: 8px;
-    }
-    /* 快速全設：3個按鈕排成 1 行，小螢幕自動折行 */
+    .removed-message { text-align: center; padding: 40px 20px; color: var(--muted); background: var(--surface2); border-radius: 12px; border: 1px dashed var(--border); }
+    .section-label { font-size: 0.68rem; font-weight: 700; text-transform: uppercase; letter-spacing: .1em; color: var(--muted); margin-bottom: 8px; }
     .quick-row { display: flex; gap: 7px; margin-bottom: 8px; flex-wrap: wrap; }
-    .quick-row .btn { flex: 1; min-width: 80px; }
-
-    /* === 通用按鈕 === */
-    .btn {
-      flex: 1; padding: 13px 8px;
-      border-radius: 12px; border: 1px solid var(--border);
-      font-family: 'Outfit', system-ui, sans-serif;
-      font-weight: 600; font-size: 0.82rem;
-      cursor: pointer; transition: all .15s;
-      white-space: nowrap; text-align: center;
-      touch-action: manipulation;
-      /* 確保最小觸控目標高度 */
-      min-height: 46px;
-      display: flex; align-items: center; justify-content: center;
-      line-height: 1.3;
-    }
+    .btn { flex: 1; padding: 13px 8px; border-radius: 12px; border: 1px solid var(--border); font-weight: 600; font-size: 0.82rem; cursor: pointer; transition: all .15s; text-align: center; min-height: 46px; display: flex; align-items: center; justify-content: center; touch-action: manipulation; }
     .btn:active { transform: scale(0.95); }
-    .btn-primary  { background: var(--primary); color: white; border-color: var(--primary); }
-    .btn-normal   { background: rgba(46,160,67,.15); color: #3fb950; border-color: rgba(46,160,67,.3); }
-    .btn-fault    { background: rgba(218,54,51,.15); color: #f85149; border-color: rgba(218,54,51,.3); }
+    .btn-primary { background: var(--primary); color: white; border-color: var(--primary); }
+    .btn-normal { background: rgba(46,160,67,.15); color: #3fb950; border-color: rgba(46,160,67,.3); }
+    .btn-fault { background: rgba(218,54,51,.15); color: #f85149; border-color: rgba(218,54,51,.3); }
     .btn-abnormal { background: rgba(230,126,34,.15); color: #f0a65a; border-color: rgba(230,126,34,.3); }
-    .btn-ghost    { background: var(--surface2); color: var(--text); border-color: var(--border); }
-    .btn-danger   { background: rgba(218,54,51,.1); color: #f85149; border-color: rgba(218,54,51,.3); }
-    .btn:disabled { opacity: 0.4; cursor: not-allowed; transform: none; pointer-events: none; }
-
-    /* === 底部固定列 === */
-    .bottom-bar {
-      position: fixed; bottom: 0; left: 0; right: 0;
-      background: var(--surface); border-top: 1px solid var(--border);
-      padding: 8px 12px;
-      padding-bottom: max(8px, var(--safe-bottom));
-      display: flex; gap: 8px; z-index: 100;
-    }
-    .bottom-bar .btn {
-      flex: 1; padding: 12px 6px;
-      font-size: 0.82rem; min-height: 46px;
-      /* 允許換行讓按鈕更緊湊 */
-      white-space: normal; line-height: 1.25;
-    }
-
-    /* === 總覽面板 === */
-    .overview-summary {
-      background: var(--surface); border: 1px solid var(--border);
-      border-radius: var(--radius); padding: 14px; margin-bottom: 12px;
-    }
-    .overview-summary-row {
-      display: flex; gap: 10px; justify-content: center; flex-wrap: wrap;
-    }
-    .ov-stat {
-      display: flex; align-items: center; gap: 5px;
-      font-size: 0.85rem; font-weight: 600;
-    }
-    .ov-dot { width: 10px; height: 10px; border-radius: 50%; flex-shrink: 0; }
-
+    .btn-ghost { background: var(--surface2); color: var(--text); border-color: var(--border); }
+    .btn-danger { background: rgba(218,54,51,.1); color: #f85149; border-color: rgba(218,54,51,.3); }
+    .bottom-bar { position: fixed; bottom: 0; left: 0; right: 0; background: var(--surface); border-top: 1px solid var(--border); padding: 8px 12px; padding-bottom: max(8px, var(--safe-bottom)); display: flex; gap: 8px; z-index: 100; }
+    .bottom-bar .btn { flex: 1; padding: 12px 6px; font-size: 0.82rem; min-height: 46px; white-space: normal; }
+    .overview-summary { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); padding: 14px; margin-bottom: 12px; }
     .overview-grid { display: grid; grid-template-columns: repeat(2,1fr); gap: 8px; }
-    .overview-card {
-      background: var(--surface); border: 1px solid var(--border);
-      border-radius: 14px; padding: 12px; cursor: pointer;
-      transition: transform .15s, border-color .15s;
-      touch-action: manipulation;
-      /* 確保觸控目標 */
-      min-height: 80px;
-    }
+    .overview-card { background: var(--surface); border: 1px solid var(--border); border-radius: 14px; padding: 12px; cursor: pointer; min-height: 80px; transition: transform .15s; touch-action: manipulation; }
     .overview-card:active { transform: scale(0.96); }
-    .overview-card.has-issue { border-color: rgba(218,54,51,.4); }
-    .overview-card.removed-card { opacity: 0.7; border-color: var(--removed); }
-
-    .ov-host-name {
-      font-family: 'JetBrains Mono', monospace;
-      font-size: 0.92rem; font-weight: 700; margin-bottom: 6px;
-    }
-    .ov-bar {
-      height: 5px; border-radius: 3px; overflow: hidden;
-      background: var(--border); display: flex; margin-bottom: 6px;
-    }
-    .ov-bar-seg { transition: width .3s ease; }
+    .ov-host-name { font-family: 'JetBrains Mono', monospace; font-size: 0.92rem; font-weight: 700; margin-bottom: 6px; }
+    .ov-bar { height: 5px; border-radius: 3px; overflow: hidden; background: var(--border); display: flex; margin-bottom: 6px; }
     .ov-counts { display: flex; gap: 8px; font-size: 0.7rem; color: var(--muted); align-items: center; }
-    .ov-count  { display: flex; align-items: center; gap: 3px; }
-    .ov-count-dot { width: 6px; height: 6px; border-radius: 50%; flex-shrink: 0; }
-    .removed-badge { font-size: 0.7rem; color: var(--removed); margin-top: 6px; text-align: center; }
-
-    /* === Toast — 移至底部，避免被 header 遮蔽 === */
-    .toast {
-      position: fixed;
-      /* 底部 bottom-bar 高度約 62+safe，再往上 16px */
-      bottom: calc(max(8px, var(--safe-bottom)) + 62px + 16px);
-      left: 50%; transform: translateX(-50%) translateY(12px);
-      background: var(--text); color: var(--bg);
-      padding: 10px 22px; border-radius: 30px;
-      font-size: 0.84rem; font-weight: 600;
-      opacity: 0; transition: all .25s; z-index: 999;
-      white-space: nowrap; pointer-events: none;
-      max-width: calc(100vw - 32px);
-      white-space: normal; text-align: center;
-      box-shadow: 0 4px 20px rgba(0,0,0,.5);
-    }
+    .toast { position: fixed; bottom: calc(max(8px, var(--safe-bottom)) + 62px + 16px); left: 50%; transform: translateX(-50%) translateY(12px); background: var(--text); color: var(--bg); padding: 10px 22px; border-radius: 30px; font-size: 0.84rem; font-weight: 600; opacity: 0; transition: all .25s; z-index: 999; white-space: nowrap; pointer-events: none; max-width: calc(100vw - 32px); text-align: center; box-shadow: 0 4px 20px rgba(0,0,0,.5); }
     .toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
-
-    /* === 響應式斷點 === */
-    @media (max-width: 360px) {
-      .grid-normal { grid-template-columns: repeat(auto-fill, minmax(46px, 1fr)); gap: 5px; }
-      .ch-card { font-size: 0.72rem; border-radius: 10px; }
-      .stat-num { font-size: 1.3rem; }
-      .host-name { font-size: 1.25rem; }
-      .btn { font-size: 0.75rem; padding: 11px 4px; }
-      .bottom-bar .btn { font-size: 0.74rem; }
-      .tab { font-size: 0.82rem; }
-    }
-
-    @media (min-width: 480px) {
-      .grid-normal { grid-template-columns: repeat(auto-fill, minmax(62px, 1fr)); }
-      .overview-grid { grid-template-columns: repeat(3, 1fr); }
-    }
-
-    @media (min-width: 600px) {
-      .grid-normal { grid-template-columns: repeat(auto-fill, minmax(68px, 1fr)); }
-      .overview-grid { grid-template-columns: repeat(3, 1fr); }
-    }
-
-    /* === 橫向模式 (短螢幕) === */
-    @media (max-height: 500px) and (orientation: landscape) {
-      body { padding-bottom: calc(64px + var(--safe-bottom)); }
-      .header { padding-top: 8px; padding-bottom: 8px; }
-      .tab { height: 40px; font-size: 0.82rem; }
-      .host-nav-row { margin-bottom: 8px; }
-      .stats-strip { margin-bottom: 8px; }
-      .stat-card { padding: 8px 4px; }
-      .bottom-bar { padding-top: 6px; padding-bottom: max(6px, var(--safe-bottom)); }
-      .bottom-bar .btn { min-height: 40px; padding: 8px 6px; font-size: 0.76rem; }
-      .ch-grid { min-height: 120px; }
-    }
-
-    /* === 高對比模式支援 === */
-    @media (prefers-contrast: high) {
-      .ch-card { outline: 2px solid rgba(255,255,255,.3); }
-      .btn { outline: 1px solid var(--border); }
-    }
-
-    /* === 防止長按選取 (iOS) === */
-    .ch-grid, .host-dots, .filter-row, .tab-bar, .bottom-bar {
-      -webkit-user-select: none;
-      user-select: none;
-    }
-
-    /* === 滾動條美化 === */
-    ::-webkit-scrollbar { width: 4px; height: 4px; }
-    ::-webkit-scrollbar-track { background: transparent; }
-    ::-webkit-scrollbar-thumb { background: var(--border); border-radius: 4px; }
+    @media (min-width: 480px) { .overview-grid { grid-template-columns: repeat(3, 1fr); } }
+    @media (min-width: 600px) { .overview-grid { grid-template-columns: repeat(3, 1fr); } }
+    @media (max-height: 500px) and (orientation: landscape) { body { padding-bottom: calc(64px + var(--safe-bottom)); } .bottom-bar .btn { min-height: 40px; } }
   </style>
 </head>
 <body>
 
 <div class="header">
-  <div class="header-logo">
-    <div class="dot"></div>
-    CCTV 點檢系統
-  </div>
+  <div class="header-logo"><div class="dot"></div>CCTV 點檢系統</div>
   <div class="header-date" id="headerDate"></div>
 </div>
-
 <div class="tab-bar">
   <div class="tab active" data-tab="inspection">🔍 點檢</div>
   <div class="tab" data-tab="overview">📊 總覽</div>
 </div>
-
 <div class="toast" id="toast"></div>
 
-<!-- ===== 點檢面板 ===== -->
 <div id="pane-inspection" class="content">
   <div class="host-nav">
     <div class="host-nav-row">
-      <button class="nav-btn" id="btnPrev" aria-label="上一主機">◀</button>
-      <div class="host-info">
-        <div class="host-name" id="hostName">--</div>
-        <div class="host-meta" id="hostMeta">--</div>
-      </div>
-      <button class="nav-btn" id="btnNext" aria-label="下一主機">▶</button>
+      <button class="nav-btn" id="btnPrev">◀</button>
+      <div class="host-info"><div class="host-name" id="hostName">--</div><div class="host-meta" id="hostMeta">--</div></div>
+      <button class="nav-btn" id="btnNext">▶</button>
     </div>
-    <div class="host-dots" id="hostDots" role="tablist" aria-label="主機選擇"></div>
+    <div class="host-dots" id="hostDots"></div>
   </div>
-
   <div class="stats-strip">
-    <div class="stat-card s-normal">
-      <div class="stat-num" id="statNormal">--</div>
-      <div class="stat-label">🟢 正常</div>
-    </div>
-    <div class="stat-card s-fault">
-      <div class="stat-num" id="statFault">--</div>
-      <div class="stat-label">🔴 故障</div>
-    </div>
-    <div class="stat-card s-abnormal">
-      <div class="stat-num" id="statAbnormal">--</div>
-      <div class="stat-label">⚠️ 異常</div>
-    </div>
+    <div class="stat-card s-normal"><div class="stat-num" id="statNormal">--</div><div class="stat-label">🟢 正常</div></div>
+    <div class="stat-card s-fault"><div class="stat-num" id="statFault">--</div><div class="stat-label">🔴 故障</div></div>
+    <div class="stat-card s-abnormal"><div class="stat-num" id="statAbnormal">--</div><div class="stat-label">⚠️ 異常</div></div>
   </div>
-
-  <div class="filter-row" role="group" aria-label="篩選狀態">
+  <div class="filter-row" role="group">
     <button class="filter-btn active" data-filter="all">全部</button>
     <button class="filter-btn" data-filter="fault">故障</button>
     <button class="filter-btn" data-filter="abnormal">異常</button>
     <button class="filter-btn" data-filter="normal">正常</button>
   </div>
-
-  <div class="legend">
-    <div class="legend-item"><div class="legend-dot" style="background:var(--normal)"></div>正常</div>
-    <div class="legend-item"><div class="legend-dot" style="background:var(--fault)"></div>故障</div>
-    <div class="legend-item"><div class="legend-dot" style="background:var(--abnormal)"></div>異常</div>
-  </div>
+  <div class="legend"><div class="legend-item"><div class="legend-dot" style="background:var(--normal)"></div>正常</div><div class="legend-item"><div class="legend-dot" style="background:var(--fault)"></div>故障</div><div class="legend-item"><div class="legend-dot" style="background:var(--abnormal)"></div>異常</div></div>
   <div class="swipe-hint">← 左右滑動換主機 →　　點擊迴路循環切換</div>
-
   <div id="chGrid" class="ch-grid"></div>
-
-  <div class="section-label" style="margin-top:4px">快速全設</div>
+  <div class="section-label">快速全設</div>
   <div class="quick-row">
-    <button class="btn btn-normal"   id="qaAllNormal">✅ 全正常</button>
-    <button class="btn btn-fault"    id="qaAllFault">❌ 全故障</button>
+    <button class="btn btn-normal" id="qaAllNormal">✅ 全正常</button>
+    <button class="btn btn-fault" id="qaAllFault">❌ 全故障</button>
     <button class="btn btn-abnormal" id="qaAllAbnormal">⚠️ 全異常</button>
   </div>
-
   <div class="section-label">重置操作</div>
   <div class="quick-row" style="margin-bottom: 16px">
-    <button class="btn btn-ghost"  id="btnResetCurrent">🔄 重置當前主機</button>
+    <button class="btn btn-ghost" id="btnResetCurrent">🔄 重置當前主機</button>
     <button class="btn btn-danger" id="btnResetAll">⚠️ 重置全部</button>
   </div>
 </div>
 
-<!-- ===== 總覽面板 ===== -->
 <div id="pane-overview" class="content" style="display:none">
   <div class="overview-summary" id="overviewSummary"></div>
   <div class="overview-grid" id="overviewGrid"></div>
 </div>
 
-<!-- ===== 底部操作列 ===== -->
 <div class="bottom-bar">
-  <button class="btn btn-ghost"   id="btnExportFault">📋 異常清單</button>
-  <button class="btn btn-primary" id="btnExportFull">📥 主機報表<br><span style="font-size:.72em;font-weight:400;opacity:.85">Excel 格式</span></button>
+  <button class="btn btn-ghost" id="btnImportReport">📂 導入報表</button>
+  <button class="btn btn-primary" id="btnExportFull">📥 主機報表<br><span style="font-size:.72em;">Excel 格式</span></button>
 </div>
 
 <script>
-// ========== 主機設定 ==========
-const HOSTS = [
-  { id: "A",  channels: 31, removed: false },
-  { id: "B",  channels: 32, removed: false },
-  { id: "C",  channels: 32, removed: false },
-  { id: "D",  channels: 24, removed: false },
-  { id: "E",  channels: 32, removed: false },
-  { id: "F",  channels: 18, removed: false },
-  { id: "G",  channels: 0,  removed: true  },
-  { id: "H",  channels: 0,  removed: true  },
-  { id: "I",  channels: 0,  removed: true  },
-  { id: "J",  channels: 32, removed: false },
-  { id: "K1", channels: 20, removed: false },
-  { id: "K2", channels: 18, removed: false },
-  { id: "L",  channels: 39, removed: false },
-  { id: "M",  channels: 59, removed: false },
-  { id: "N",  channels: 52, removed: false },
-  { id: "O",  channels: 51, removed: false },
-  { id: "P",  channels: 40, removed: false },
-  { id: "Q1", channels: 16, removed: false },
-  { id: "Q2", channels: 25, removed: false },
-  { id: "R",  channels: 49, removed: false },
-  { id: "S",  channels: 12, removed: false }
-];
+  // ------------------------------ 預設主機結構 ------------------------------
+  const DEFAULT_HOSTS = [
+    { id: "A",  channels: 31, removed: false }, { id: "B",  channels: 32, removed: false }, { id: "C",  channels: 32, removed: false },
+    { id: "D",  channels: 24, removed: false }, { id: "E",  channels: 32, removed: false }, { id: "F",  channels: 18, removed: false },
+    { id: "G",  channels: 0,  removed: true  }, { id: "H",  channels: 0,  removed: true  }, { id: "I",  channels: 0,  removed: true  },
+    { id: "J",  channels: 32, removed: false }, { id: "K1", channels: 20, removed: false }, { id: "K2", channels: 18, removed: false },
+    { id: "L",  channels: 39, removed: false }, { id: "M",  channels: 59, removed: false }, { id: "N",  channels: 52, removed: false },
+    { id: "O",  channels: 51, removed: false }, { id: "P",  channels: 40, removed: false }, { id: "Q1", channels: 16, removed: false },
+    { id: "Q2", channels: 25, removed: false }, { id: "R",  channels: 49, removed: false }, { id: "S",  channels: 12, removed: false }
+  ];
 
-const STORAGE_KEY = 'cctv_excel_v2_state';
-let state = {};
-let curIdx = 0;
-let curFilter = 'all';
+  let HOSTS = [];          // 動態主機陣列
+  let state = {};          // { hostId: { channel: 0/1/2 } }
+  let curIdx = 0;
+  let curFilter = 'all';
+  let currentTab = 'inspection';
 
-// ---------- 觸覺反饋 (iOS/Android) ----------
-function haptic(ms = 8) {
-  try { if (navigator.vibrate) navigator.vibrate(ms); } catch(_) {}
-}
+  const STORAGE_KEY = 'cctv_dynamic_v5';
 
-// ---------- 狀態管理 ----------
-function loadState() {
-  try {
-    const raw = localStorage.getItem(STORAGE_KEY);
-    const parsed = raw ? JSON.parse(raw) : {};
+  // 輔助函式
+  function haptic(ms = 8) { try { if (navigator.vibrate) navigator.vibrate(ms); } catch(_) {} }
+  function toast(msg) { const el = document.getElementById('toast'); el.textContent = msg; el.classList.add('show'); clearTimeout(el._t); el._t = setTimeout(() => el.classList.remove('show'), 2800); }
+
+  // 統計某主機
+  function hostStats(host) {
+    const s = state[host.id] || {};
+    let normal = 0, fault = 0, abnormal = 0;
+    for (let ch = 1; ch <= host.channels; ch++) {
+      const v = s[ch] ?? 0;
+      if (v === 0) normal++;
+      else if (v === 1) fault++;
+      else abnormal++;
+    }
+    return { normal, fault, abnormal, total: host.channels };
+  }
+
+  function getFaultChannels(hostId) { return getChannelsByState(hostId, 1); }
+  function getAbnormalChannels(hostId) { return getChannelsByState(hostId, 2); }
+  function getChannelsByState(hostId, targetState) {
+    const host = HOSTS.find(h => h.id === hostId);
+    if (!host || host.removed || host.channels === 0) return [];
+    const hostState = state[hostId] || {};
+    const list = [];
+    for (let ch = 1; ch <= host.channels; ch++) if ((hostState[ch] ?? 0) === targetState) list.push(ch);
+    return list;
+  }
+
+  // 儲存完整資料 (主機列表 + 狀態)
+  function saveFull() {
+    localStorage.setItem(STORAGE_KEY, JSON.stringify({ hosts: HOSTS, state: state }));
+  }
+
+  // 初始化狀態 (依照目前 HOSTS 重置所有通道為正常)
+  function initStateFromHosts() {
+    const newState = {};
     for (const h of HOSTS) {
-      if (!parsed[h.id]) parsed[h.id] = {};
-      for (let ch = 1; ch <= h.channels; ch++) {
-        if (parsed[h.id][ch] === undefined) parsed[h.id][ch] = 0;
+      newState[h.id] = {};
+      if (!h.removed && h.channels > 0) {
+        for (let ch = 1; ch <= h.channels; ch++) newState[h.id][ch] = 0;
       }
     }
-    state = parsed;
-  } catch { initState(); }
-  saveState();
-}
-
-function initState() {
-  state = {};
-  for (const h of HOSTS) {
-    state[h.id] = {};
-    for (let ch = 1; ch <= h.channels; ch++) state[h.id][ch] = 0;
+    state = newState;
+    saveFull();
   }
-}
 
-function saveState() { localStorage.setItem(STORAGE_KEY, JSON.stringify(state)); }
-
-function hostStats(host) {
-  const s = state[host.id] || {};
-  let normal = 0, fault = 0, abnormal = 0;
-  for (let ch = 1; ch <= host.channels; ch++) {
-    const v = s[ch] ?? 0;
-    if (v === 0) normal++;
-    else if (v === 1) fault++;
-    else abnormal++;
-  }
-  return { normal, fault, abnormal, total: host.channels };
-}
-
-function getFaultChannels(hostId)    { return getChannelsByState(hostId, 1); }
-function getAbnormalChannels(hostId) { return getChannelsByState(hostId, 2); }
-function getChannelsByState(hostId, targetState) {
-  const hostState = state[hostId] || {};
-  const list = [];
-  const host = HOSTS.find(h => h.id === hostId);
-  if (!host || host.channels === 0) return list;
-  for (let ch = 1; ch <= host.channels; ch++) {
-    if ((hostState[ch] ?? 0) === targetState) list.push(ch);
-  }
-  return list;
-}
-
-// ---------- 渲染 ----------
-function renderHeader() {
-  const d = new Date();
-  const pad = n => String(n).padStart(2, '0');
-  document.getElementById('headerDate').textContent =
-    `${d.getFullYear()}/${pad(d.getMonth()+1)}/${pad(d.getDate())} 週${['日','一','二','三','四','五','六'][d.getDay()]}`;
-}
-
-function renderInspection() {
-  renderHostNav();
-  renderGrid();
-  const currentHost = HOSTS[curIdx];
-  ['qaAllNormal', 'qaAllFault', 'qaAllAbnormal', 'btnResetCurrent'].forEach(id => {
-    document.getElementById(id).disabled = currentHost.removed;
-  });
-}
-
-function renderHostNav() {
-  const h = HOSTS[curIdx];
-  const st = hostStats(h);
-  document.getElementById('hostName').textContent = h.id;
-  document.getElementById('hostMeta').textContent = h.removed
-    ? `已拆除 (無迴路)`
-    : `${h.channels} 迴路　${curIdx + 1} / ${HOSTS.length}`;
-  document.getElementById('statNormal').textContent   = st.normal;
-  document.getElementById('statFault').textContent    = st.fault;
-  document.getElementById('statAbnormal').textContent = st.abnormal;
-
-  const dotsEl = document.getElementById('hostDots');
-  dotsEl.innerHTML = '';
-  HOSTS.forEach((hh, i) => {
-    const hs = hostStats(hh);
-    const dot = document.createElement('div');
-    dot.className = 'host-dot';
-    dot.setAttribute('role', 'tab');
-    dot.setAttribute('aria-label', hh.id + (hh.removed ? ' 已拆除' : ''));
-    dot.setAttribute('aria-selected', i === curIdx ? 'true' : 'false');
-    if (hh.removed) {
-      dot.classList.add('removed');
-    } else if (i === curIdx) {
-      dot.classList.add('current');
-    } else if (hs.fault > 0) {
-      dot.classList.add('has-fault');
-    } else if (hs.abnormal > 0) {
-      dot.classList.add('has-abnormal');
-    } else {
-      dot.classList.add('all-ok');
+  // 載入儲存資料
+  function loadFull() {
+    const raw = localStorage.getItem(STORAGE_KEY);
+    if (!raw) {
+      HOSTS = JSON.parse(JSON.stringify(DEFAULT_HOSTS));
+      initStateFromHosts();
+      return;
     }
-    dot.title = hh.id + (hh.removed ? ' (已拆除)' : '');
-    if (!hh.removed) {
-      dot.addEventListener('click', () => { haptic(); curIdx = i; renderInspection(); });
-    }
-    dotsEl.appendChild(dot);
-  });
-}
-
-function renderGrid() {
-  const h = HOSTS[curIdx];
-  const grid = document.getElementById('chGrid');
-  grid.innerHTML = '';
-
-  if (h.removed) {
-    const msgDiv = document.createElement('div');
-    msgDiv.className = 'removed-message';
-    msgDiv.innerHTML = '🚧 此主機已拆除，無迴路資料 🚧';
-    grid.appendChild(msgDiv);
-    return;
+    try {
+      const data = JSON.parse(raw);
+      if (data.hosts && Array.isArray(data.hosts) && data.state) {
+        HOSTS = data.hosts;
+        state = data.state;
+        // 確保每個主機的通道數目與 state 一致 (補缺)
+        for (const h of HOSTS) {
+          if (!state[h.id]) state[h.id] = {};
+          if (!h.removed && h.channels > 0) {
+            for (let ch = 1; ch <= h.channels; ch++) if (state[h.id][ch] === undefined) state[h.id][ch] = 0;
+          }
+        }
+      } else {
+        // 舊版僅有 state 物件, 用預設 HOSTS
+        HOSTS = JSON.parse(JSON.stringify(DEFAULT_HOSTS));
+        const oldState = data;
+        state = {};
+        for (const h of HOSTS) {
+          state[h.id] = {};
+          for (let ch = 1; ch <= h.channels; ch++) {
+            const oldVal = oldState?.[h.id]?.[ch];
+            state[h.id][ch] = (oldVal !== undefined && [0,1,2].includes(oldVal)) ? oldVal : 0;
+          }
+        }
+        saveFull();
+      }
+    } catch(e) { HOSTS = JSON.parse(JSON.stringify(DEFAULT_HOSTS)); initStateFromHosts(); }
+    if (curIdx >= HOSTS.length) curIdx = 0;
   }
 
-  const hs = state[h.id];
-  const filterMap = { fault: 1, abnormal: 2, normal: 0, all: -1 };
-  const filterVal = filterMap[curFilter];
+  // 導入報表 CSV (完全取代主機配置與點檢狀態)
+  function importFromCSV(csvText) {
+    const lines = csvText.replace(/^\uFEFF/, '').split(/\r?\n/).filter(l => l.trim().length > 0);
+    if (lines.length < 2) throw new Error('檔案內容不足');
+    const header = lines[0];
+    if (!header.includes('主機') || !header.includes('CH總數')) throw new Error('CSV 格式不符，請使用系統導出的主機報表');
+    
+    const newHostsMap = new Map(); // id -> { channels, faultList, abnormalList }
+    for (let i = 1; i < lines.length; i++) {
+      const row = parseCSVRow(lines[i]);
+      if (row.length < 6) continue;
+      const hostId = row[0].trim();
+      if (!hostId) continue;
+      // 跳過總結行 (全場總計)
+      if (hostId === '全場總計' || hostId.includes('總計')) continue;
+      
+      const totalCh = parseInt(row[1], 10);
+      if (isNaN(totalCh)) continue; // 無效通道數則跳過
+      const channels = totalCh < 0 ? 0 : totalCh;
+      const faultStr = row[2].trim();
+      const remark = row[5] || '';
+      
+      // 解析故障列表
+      const faultList = faultStr ? faultStr.split(',').map(s => parseInt(s.trim(), 10)).filter(n => !isNaN(n) && n > 0) : [];
+      // 解析異常通道 (從備註擷取 "異常通道: 數字,數字")
+      let abnormalList = [];
+      const abnormalMatch = remark.match(/異常通道:\s*([\d,]+)/);
+      if (abnormalMatch) {
+        abnormalList = abnormalMatch[1].split(',').map(s => parseInt(s.trim(), 10)).filter(n => !isNaN(n) && n > 0);
+      }
+      
+      // ★ 關鍵：只要 CH總數 > 0，主機就視為存在（非拆除），完全忽略備註中的拆除字眼
+      // 若 CH總數 === 0 則視為拆除主機
+      const isRemoved = (channels === 0);
+      
+      newHostsMap.set(hostId, { channels, removed: isRemoved, faultList, abnormalList });
+    }
+    
+    if (newHostsMap.size === 0) throw new Error('未解析到任何主機資料');
+    
+    // 建立新主機陣列
+    const newHosts = [];
+    for (let [id, cfg] of newHostsMap.entries()) {
+      newHosts.push({ id, channels: cfg.channels, removed: cfg.removed });
+    }
+    
+    // 建立新 state
+    const newState = {};
+    for (let [id, cfg] of newHostsMap.entries()) {
+      const hostCh = cfg.channels;
+      const stateObj = {};
+      if (!cfg.removed && hostCh > 0) {
+        // 預設全部正常
+        for (let ch = 1; ch <= hostCh; ch++) stateObj[ch] = 0;
+        // 設定故障
+        for (let ch of cfg.faultList) if (ch >= 1 && ch <= hostCh) stateObj[ch] = 1;
+        // 設定異常 (不覆蓋故障)
+        for (let ch of cfg.abnormalList) if (ch >= 1 && ch <= hostCh && stateObj[ch] !== 1) stateObj[ch] = 2;
+      }
+      newState[id] = stateObj;
+    }
+    
+    // 替換全域
+    HOSTS = newHosts;
+    state = newState;
+    saveFull();
+    
+    // 校正索引
+    if (curIdx >= HOSTS.length) curIdx = 0;
+    // 刷新介面
+    refreshUIAfterImport();
+    toast(`成功導入 ${HOSTS.length} 台主機，狀態已還原 (CH總數>0的主機自動恢復)`);
+  }
 
-  const gridContainer = document.createElement('div');
-  gridContainer.className = 'grid-normal';
+  // 簡易 CSV 行解析 (處理引號)
+  function parseCSVRow(line) {
+    const result = [];
+    let inQuote = false;
+    let current = '';
+    for (let i = 0; i < line.length; i++) {
+      const ch = line[i];
+      if (ch === '"') {
+        if (inQuote && line[i+1] === '"') { current += '"'; i++; }
+        else inQuote = !inQuote;
+      } else if (ch === ',' && !inQuote) {
+        result.push(current);
+        current = '';
+      } else {
+        current += ch;
+      }
+    }
+    result.push(current);
+    return result.map(s => s.trim());
+  }
 
-  for (let ch = 1; ch <= h.channels; ch++) {
-    const v = hs[ch] !== undefined ? hs[ch] : 0;
-    const card = document.createElement('div');
-    card.className = 'ch-card';
-    card.dataset.state = v;
-    card.dataset.ch = ch;
-    card.textContent = ch;
-    card.setAttribute('role', 'button');
-    card.setAttribute('aria-label', `迴路 ${ch}`);
-    if (filterVal !== -1 && v !== filterVal) card.classList.add('hidden');
+  // 匯出主機報表 (完全符合導入格式)
+  function exportHostSheet() {
+    const rows = [['主機', 'CH總數', '故障編號', '故障數', '正常總數', '備註']];
+    for (const h of HOSTS) {
+      if (h.removed) {
+        rows.push([h.id, 0, '', 0, 0, '主機拆除']);
+        continue;
+      }
+      const faultList = getFaultChannels(h.id);
+      const abnormalList = getAbnormalChannels(h.id);
+      const stats = hostStats(h);
+      const normalCount = stats.normal;
+      const remark = abnormalList.length ? `異常通道: ${abnormalList.join(',')}；待填寫原因` : '';
+      rows.push([
+        h.id, stats.total,
+        faultList.join(','),
+        faultList.length,
+        normalCount,
+        remark
+      ]);
+    }
+    const totalCh = HOSTS.reduce((s,h)=>s+h.channels, 0);
+    const totalFaultSum = rows.slice(1).reduce((s,r)=>s+(Number(r[3])||0), 0);
+    const totalAbnormalCh = HOSTS.reduce((s,h)=>s+getAbnormalChannels(h.id).length, 0);
+    rows.push(['全場總計', totalCh, '', totalFaultSum, totalCh-totalFaultSum-totalAbnormalCh, `異常總數:${totalAbnormalCh}`]);
+    downloadCsv(rows, `CCTV點檢_主機報表_${dateStr()}.csv`);
+    toast('已匯出主機報表 (可再次導入)');
+  }
 
-    card.addEventListener('click', () => {
-      haptic(6);
-      const next = (parseInt(card.dataset.state) + 1) % 3;
-      card.dataset.state = next;
-      hs[ch] = next;
-      saveState();
-      updateStatsOnly();
-      updateDotsOnly();
-      if (filterVal !== -1 && next !== filterVal) card.classList.add('hidden');
-      else card.classList.remove('hidden');
+  function downloadCsv(rows, filename) {
+    const csv = rows.map(r => r.map(c => `"${String(c).replace(/"/g,'""')}"`).join(',')).join('\r\n');
+    const blob = new Blob(['\uFEFF' + csv], { type: 'text/csv;charset=utf-8;' });
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(blob);
+    a.download = filename;
+    document.body.appendChild(a); a.click(); document.body.removeChild(a);
+    URL.revokeObjectURL(a.href);
+  }
+  function dateStr() { const d = new Date(); return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`; }
+
+  // 更新所有渲染
+  function refreshUIAfterImport() {
+    if (currentTab === 'inspection') renderInspection();
+    else { renderOverview(); }
+  }
+
+  function renderHeader() { const d = new Date(); document.getElementById('headerDate').textContent = `${d.getFullYear()}/${String(d.getMonth()+1).padStart(2,'0')}/${String(d.getDate()).padStart(2,'0')} 週${['日','一','二','三','四','五','六'][d.getDay()]}`; }
+  function renderInspection() { renderHostNav(); renderGrid(); const curHost = HOSTS[curIdx]; ['qaAllNormal','qaAllFault','qaAllAbnormal','btnResetCurrent'].forEach(id => document.getElementById(id).disabled = curHost?.removed); }
+  function renderHostNav() {
+    const h = HOSTS[curIdx]; if(!h) return;
+    const st = hostStats(h);
+    document.getElementById('hostName').textContent = h.id;
+    document.getElementById('hostMeta').textContent = h.removed ? `已拆除 (無迴路)` : `${h.channels} 迴路　${curIdx+1} / ${HOSTS.length}`;
+    document.getElementById('statNormal').textContent = st.normal;
+    document.getElementById('statFault').textContent = st.fault;
+    document.getElementById('statAbnormal').textContent = st.abnormal;
+    const dotsEl = document.getElementById('hostDots');
+    dotsEl.innerHTML = '';
+    HOSTS.forEach((hh, i) => {
+      const hs = hostStats(hh);
+      const dot = document.createElement('div');
+      dot.className = 'host-dot';
+      if (hh.removed) dot.classList.add('removed');
+      else if (i === curIdx) dot.classList.add('current');
+      else if (hs.fault > 0) dot.classList.add('has-fault');
+      else if (hs.abnormal > 0) dot.classList.add('has-abnormal');
+      else dot.classList.add('all-ok');
+      dot.title = hh.id + (hh.removed ? ' (已拆除)' : '');
+      if (!hh.removed) dot.addEventListener('click', () => { haptic(); curIdx = i; renderInspection(); });
+      dotsEl.appendChild(dot);
     });
-    gridContainer.appendChild(card);
   }
-  grid.appendChild(gridContainer);
-}
-
-function updateStatsOnly() {
-  const st = hostStats(HOSTS[curIdx]);
-  document.getElementById('statNormal').textContent   = st.normal;
-  document.getElementById('statFault').textContent    = st.fault;
-  document.getElementById('statAbnormal').textContent = st.abnormal;
-}
-
-function updateDotsOnly() {
-  document.querySelectorAll('.host-dot').forEach((dot, i) => {
-    const hh = HOSTS[i];
-    if (hh.removed) { dot.className = 'host-dot removed'; return; }
-    const hs = hostStats(hh);
-    dot.className = 'host-dot';
-    if (i === curIdx)        dot.classList.add('current');
-    else if (hs.fault > 0)   dot.classList.add('has-fault');
-    else if (hs.abnormal > 0)dot.classList.add('has-abnormal');
-    else                     dot.classList.add('all-ok');
-  });
-}
-
-function renderOverview() {
-  let totalNormal = 0, totalFault = 0, totalAbnormal = 0, totalCh = 0;
-  HOSTS.forEach(h => {
-    const s = hostStats(h);
-    totalNormal   += s.normal;
-    totalFault    += s.fault;
-    totalAbnormal += s.abnormal;
-    totalCh       += s.total;
-  });
-
-  document.getElementById('overviewSummary').innerHTML = `
-    <div class="section-label" style="margin-bottom:10px">全場統計</div>
-    <div class="overview-summary-row">
-      <span class="ov-stat"><div class="ov-dot" style="background:var(--normal)"></div>正常 ${totalNormal}</span>
-      <span class="ov-stat"><div class="ov-dot" style="background:var(--fault)"></div>故障 ${totalFault}</span>
-      <span class="ov-stat"><div class="ov-dot" style="background:var(--abnormal)"></div>異常 ${totalAbnormal}</span>
-      <span class="ov-stat" style="color:var(--muted)">共 ${totalCh} 迴路</span>
-    </div>
-    <div style="height:8px;border-radius:4px;overflow:hidden;background:var(--border);display:flex;margin-top:12px">
-      <div style="width:${totalCh ? (totalNormal/totalCh*100).toFixed(1) : 0}%;background:var(--normal);transition:width .4s"></div>
-      <div style="width:${totalCh ? (totalFault/totalCh*100).toFixed(1) : 0}%;background:var(--fault);transition:width .4s"></div>
-      <div style="width:${totalCh ? (totalAbnormal/totalCh*100).toFixed(1) : 0}%;background:var(--abnormal);transition:width .4s"></div>
-    </div>
-  `;
-
-  const grid = document.getElementById('overviewGrid');
-  grid.innerHTML = '';
-  HOSTS.forEach((h, i) => {
-    const s = hostStats(h);
-    const card = document.createElement('div');
-    card.className = 'overview-card';
-    if (h.removed) card.classList.add('removed-card');
-    else if (s.fault > 0 || s.abnormal > 0) card.classList.add('has-issue');
-
-    if (h.removed) {
-      card.innerHTML = `
-        <div class="ov-host-name">${h.id}</div>
-        <div class="removed-badge">🚧 主機已拆除</div>
-        <div class="ov-counts" style="margin-top:6px"><span class="ov-count">迴路數: 0</span></div>
-      `;
-    } else {
-      const np = (s.normal   / s.total * 100).toFixed(1);
-      const fp = (s.fault    / s.total * 100).toFixed(1);
-      const ap = (s.abnormal / s.total * 100).toFixed(1);
-      card.innerHTML = `
-        <div class="ov-host-name">${h.id}</div>
-        <div class="ov-bar">
-          <div class="ov-bar-seg" style="width:${np}%;background:var(--normal)"></div>
-          <div class="ov-bar-seg" style="width:${fp}%;background:var(--fault)"></div>
-          <div class="ov-bar-seg" style="width:${ap}%;background:var(--abnormal)"></div>
-        </div>
-        <div class="ov-counts">
-          <span class="ov-count"><div class="ov-count-dot" style="background:var(--normal)"></div>${s.normal}</span>
-          <span class="ov-count"><div class="ov-count-dot" style="background:var(--fault)"></div>${s.fault}</span>
-          <span class="ov-count"><div class="ov-count-dot" style="background:var(--abnormal)"></div>${s.abnormal}</span>
-          <span style="margin-left:auto">${s.total}CH</span>
-        </div>
-      `;
-    }
-    card.addEventListener('click', () => { haptic(); curIdx = i; switchTab('inspection'); renderInspection(); });
-    grid.appendChild(card);
-  });
-}
-
-function switchTab(tab) {
-  const inspectionPane = document.getElementById('pane-inspection');
-  const overviewPane   = document.getElementById('pane-overview');
-  const tabs = document.querySelectorAll('.tab');
-  if (tab === 'inspection') {
-    tabs[0].classList.add('active');    tabs[1].classList.remove('active');
-    inspectionPane.style.display = 'block'; overviewPane.style.display = 'none';
-  } else {
-    tabs[0].classList.remove('active'); tabs[1].classList.add('active');
-    inspectionPane.style.display = 'none'; overviewPane.style.display = 'block';
-    renderOverview();
-  }
-  // 切換 tab 後回到頂部
-  window.scrollTo({ top: 0, behavior: 'smooth' });
-}
-
-function setAllCurrent(val) {
-  const h = HOSTS[curIdx];
-  if (h.removed) { toast('此主機已拆除，無法設定狀態'); return; }
-  const labels = ['正常', '故障', '異常'];
-  for (let ch = 1; ch <= h.channels; ch++) state[h.id][ch] = val;
-  saveState();
-  renderGrid();
-  updateStatsOnly();
-  updateDotsOnly();
-  haptic(15);
-  toast(`${h.id} 已全設為「${labels[val]}」`);
-}
-
-// ---------- 匯出 ----------
-function exportHostSheet() {
-  const rows = [['主機', 'CH總數', '故障編號', '故障數', '正常總數', '備註']];
-  for (const h of HOSTS) {
-    if (h.removed) { rows.push([h.id, 0, '', 0, 0, '主機拆除']); continue; }
-    const faultList    = getFaultChannels(h.id);
-    const abnormalList = getAbnormalChannels(h.id);
-    const stats = hostStats(h);
-    rows.push([
-      h.id, stats.total, faultList.join(','), faultList.length,
-      stats.total - faultList.length - abnormalList.length,
-      abnormalList.length > 0 ? `異常通道: ${abnormalList.join(',')}；待填寫原因` : ''
-    ]);
-  }
-  const totalCh = HOSTS.reduce((s,h)=>s+h.channels, 0);
-  const totalFaultSum    = rows.slice(1).reduce((s,r)=>s+(Number(r[3])||0), 0);
-  const totalAbnormalCh  = HOSTS.reduce((s,h)=>s+getAbnormalChannels(h.id).length, 0);
-  rows.push(['全場總計', totalCh, '', totalFaultSum, totalCh-totalFaultSum-totalAbnormalCh, `異常總數:${totalAbnormalCh}`]);
-
-  downloadCsv(rows, `CCTV點檢_主機報表_${dateStr()}.csv`);
-  toast('已匯出主機報表');
-}
-
-function exportFaultList() {
-  const rows = [['CCTV 異常清單', `匯出日期: ${new Date().toLocaleString()}`], [],
-                ['主機ID', '迴路編號', '狀態類型']];
-  let count = 0;
-  for (const h of HOSTS) {
-    if (h.removed) continue;
+  function renderGrid() {
+    const h = HOSTS[curIdx]; const grid = document.getElementById('chGrid'); grid.innerHTML = '';
+    if (h.removed) { grid.innerHTML = '<div class="removed-message">🚧 此主機已拆除，無迴路資料 🚧</div>'; return; }
     const hs = state[h.id] || {};
-    for (let ch = 1; ch <= h.channels; ch++) {
-      const v = hs[ch] ?? 0;
-      if (v === 1) { rows.push([h.id, ch, '故障']); count++; }
-      else if (v === 2) { rows.push([h.id, ch, '異常']); count++; }
+    const filterMap = { fault:1, abnormal:2, normal:0, all:-1 };
+    const filterVal = filterMap[curFilter];
+    const gridContainer = document.createElement('div'); gridContainer.className = 'grid-normal';
+    for (let ch=1; ch<=h.channels; ch++) {
+      const v = hs[ch] !== undefined ? hs[ch] : 0;
+      const card = document.createElement('div');
+      card.className = 'ch-card'; card.dataset.state = v; card.dataset.ch = ch; card.textContent = ch;
+      if (filterVal !== -1 && v !== filterVal) card.classList.add('hidden');
+      card.addEventListener('click', () => {
+        haptic(6);
+        const next = (parseInt(card.dataset.state) + 1) % 3;
+        card.dataset.state = next; hs[ch] = next; saveFull();
+        updateStatsOnly(); updateDotsOnly();
+        if (filterVal !== -1 && next !== filterVal) card.classList.add('hidden'); else card.classList.remove('hidden');
+      });
+      gridContainer.appendChild(card);
     }
+    grid.appendChild(gridContainer);
   }
-  if (count === 0) { toast('目前無故障或異常記錄'); return; }
-  downloadCsv(rows, `CCTV_異常清單_${dateStr()}.csv`);
-  toast(`已匯出 ${count} 筆異常明細`);
-}
+  function updateStatsOnly() { const st = hostStats(HOSTS[curIdx]); document.getElementById('statNormal').textContent = st.normal; document.getElementById('statFault').textContent = st.fault; document.getElementById('statAbnormal').textContent = st.abnormal; }
+  function updateDotsOnly() { document.querySelectorAll('.host-dot').forEach((dot,i)=>{ if(i>=HOSTS.length) return; const hh=HOSTS[i], hs=hostStats(hh); dot.className='host-dot'; if(hh.removed) dot.classList.add('removed'); else if(i===curIdx) dot.classList.add('current'); else if(hs.fault>0) dot.classList.add('has-fault'); else if(hs.abnormal>0) dot.classList.add('has-abnormal'); else dot.classList.add('all-ok'); }); }
 
-function downloadCsv(rows, filename) {
-  const csv = rows.map(r => r.map(c => `"${String(c).replace(/"/g,'""')}"`).join(',')).join('\r\n');
-  const blob = new Blob(['\uFEFF' + csv], { type: 'text/csv;charset=utf-8;' });
-  const a = document.createElement('a');
-  a.href = URL.createObjectURL(blob);
-  a.download = filename;
-  document.body.appendChild(a); a.click(); document.body.removeChild(a);
-  URL.revokeObjectURL(a.href);
-}
-
-function dateStr() {
-  const d = new Date();
-  return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
-}
-
-function toast(msg) {
-  const el = document.getElementById('toast');
-  el.textContent = msg;
-  el.classList.add('show');
-  clearTimeout(el._t);
-  el._t = setTimeout(() => el.classList.remove('show'), 2800);
-}
-
-// ---------- 事件綁定 ----------
-document.querySelectorAll('.filter-btn').forEach(btn => {
-  btn.addEventListener('click', () => {
-    haptic(6);
-    curFilter = btn.dataset.filter;
-    document.querySelectorAll('.filter-btn').forEach(b => b.classList.remove('active'));
-    btn.classList.add('active');
-    const filterMap = { fault: 1, abnormal: 2, normal: 0, all: -1 };
-    const fv = filterMap[curFilter];
-    document.getElementById('chGrid').querySelectorAll('.ch-card').forEach(card => {
-      if (fv === -1) card.classList.remove('hidden');
-      else if (parseInt(card.dataset.state) !== fv) card.classList.add('hidden');
-      else card.classList.remove('hidden');
+  function renderOverview() {
+    let totalNormal=0, totalFault=0, totalAbnormal=0, totalCh=0;
+    HOSTS.forEach(h=>{ const s=hostStats(h); totalNormal+=s.normal; totalFault+=s.fault; totalAbnormal+=s.abnormal; totalCh+=s.total; });
+    document.getElementById('overviewSummary').innerHTML = `<div class="section-label">全場統計</div><div class="overview-summary-row"><span class="ov-stat"><div class="ov-dot" style="background:var(--normal)"></div>正常 ${totalNormal}</span><span class="ov-stat"><div class="ov-dot" style="background:var(--fault)"></div>故障 ${totalFault}</span><span class="ov-stat"><div class="ov-dot" style="background:var(--abnormal)"></div>異常 ${totalAbnormal}</span><span class="ov-stat">共 ${totalCh} 迴路</span></div><div style="height:8px;border-radius:4px;overflow:hidden;background:var(--border);display:flex;margin-top:12px"><div style="width:${totalCh?(totalNormal/totalCh*100).toFixed(1):0}%;background:var(--normal)"></div><div style="width:${totalCh?(totalFault/totalCh*100).toFixed(1):0}%;background:var(--fault)"></div><div style="width:${totalCh?(totalAbnormal/totalCh*100).toFixed(1):0}%;background:var(--abnormal)"></div></div>`;
+    const grid = document.getElementById('overviewGrid'); grid.innerHTML = '';
+    HOSTS.forEach((h,i)=>{ const s=hostStats(h); const card=document.createElement('div'); card.className='overview-card'; if(h.removed) card.classList.add('removed-card'); else if(s.fault>0||s.abnormal>0) card.classList.add('has-issue'); if(h.removed){ card.innerHTML=`<div class="ov-host-name">${h.id}</div><div class="removed-badge">🚧 已拆除</div><div class="ov-counts">迴路數:0</div>`; }else{ const np=(s.normal/s.total*100).toFixed(1), fp=(s.fault/s.total*100).toFixed(1), ap=(s.abnormal/s.total*100).toFixed(1); card.innerHTML=`<div class="ov-host-name">${h.id}</div><div class="ov-bar"><div style="width:${np}%;background:var(--normal)"></div><div style="width:${fp}%;background:var(--fault)"></div><div style="width:${ap}%;background:var(--abnormal)"></div></div><div class="ov-counts"><span><div class="ov-count-dot" style="background:var(--normal)"></div>${s.normal}</span><span><div class="ov-count-dot" style="background:var(--fault)"></div>${s.fault}</span><span><div class="ov-count-dot" style="background:var(--abnormal)"></div>${s.abnormal}</span><span>${s.total}CH</span></div>`; }
+      card.addEventListener('click',()=>{ haptic(); curIdx=i; switchTab('inspection'); renderInspection(); }); grid.appendChild(card);
     });
-  });
-});
-
-document.getElementById('btnPrev').addEventListener('click', () => {
-  haptic(); curIdx = (curIdx - 1 + HOSTS.length) % HOSTS.length; renderInspection();
-});
-document.getElementById('btnNext').addEventListener('click', () => {
-  haptic(); curIdx = (curIdx + 1) % HOSTS.length; renderInspection();
-});
-
-document.querySelectorAll('.tab').forEach(tab => {
-  tab.addEventListener('click', () => { haptic(6); switchTab(tab.dataset.tab); });
-});
-
-document.getElementById('qaAllNormal').addEventListener('click',   () => setAllCurrent(0));
-document.getElementById('qaAllFault').addEventListener('click',    () => setAllCurrent(1));
-document.getElementById('qaAllAbnormal').addEventListener('click', () => setAllCurrent(2));
-
-document.getElementById('btnResetCurrent').addEventListener('click', () => {
-  const h = HOSTS[curIdx];
-  if (h.removed) { toast('拆除主機無法重置'); return; }
-  if (confirm(`重置 ${h.id} 為全部正常？`)) { haptic(20); setAllCurrent(0); }
-});
-document.getElementById('btnResetAll').addEventListener('click', () => {
-  if (confirm('⚠️ 清除所有主機點檢記錄？無法復原。')) {
-    haptic(30); initState(); saveState(); renderInspection(); toast('已重置全部主機');
   }
-});
 
-document.getElementById('btnExportFull').addEventListener('click',  () => exportHostSheet());
-document.getElementById('btnExportFault').addEventListener('click', () => exportFaultList());
-
-// ---------- 手勢滑動 (改善版：支援多點觸控保護) ----------
-let tsx = 0, tsy = 0, tActive = false;
-const gridEl = document.getElementById('chGrid');
-
-gridEl.addEventListener('touchstart', e => {
-  if (e.touches.length !== 1) { tActive = false; return; }
-  tsx = e.touches[0].clientX;
-  tsy = e.touches[0].clientY;
-  tActive = true;
-}, { passive: true });
-
-gridEl.addEventListener('touchmove', e => {
-  if (!tActive || e.touches.length !== 1) return;
-  const dx = e.touches[0].clientX - tsx;
-  const dy = Math.abs(e.touches[0].clientY - tsy);
-  // 若水平移動大於垂直，阻止頁面縱向滾動，以確保流暢切換
-  if (Math.abs(dx) > dy && Math.abs(dx) > 15) {
-    e.preventDefault();
+  function switchTab(tab) {
+    currentTab = tab;
+    const insp = document.getElementById('pane-inspection'), ov = document.getElementById('pane-overview');
+    document.querySelectorAll('.tab').forEach((t,i)=>{ if(i===0 && tab==='inspection') t.classList.add('active'); else if(i===1 && tab==='overview') t.classList.add('active'); else t.classList.remove('active'); });
+    if(tab==='inspection') { insp.style.display='block'; ov.style.display='none'; renderInspection(); } else { insp.style.display='none'; ov.style.display='block'; renderOverview(); }
+    window.scrollTo({top:0,behavior:'smooth'});
   }
-}, { passive: false });
 
-gridEl.addEventListener('touchend', e => {
-  if (!tActive) return;
-  tActive = false;
-  const dx = e.changedTouches[0].clientX - tsx;
-  const dy = Math.abs(e.changedTouches[0].clientY - tsy);
-  if (Math.abs(dx) > 60 && dy < 50) {
-    haptic(8);
-    curIdx = dx < 0 ? (curIdx + 1) % HOSTS.length : (curIdx - 1 + HOSTS.length) % HOSTS.length;
-    renderInspection();
+  function setAllCurrent(val) { const h=HOSTS[curIdx]; if(h.removed){ toast('已拆除主機無法設定'); return; } for(let ch=1;ch<=h.channels;ch++) state[h.id][ch]=val; saveFull(); renderGrid(); updateStatsOnly(); updateDotsOnly(); toast(`${h.id} 已全設為${['正常','故障','異常'][val]}`); }
+
+  // 導入按鈕 UI
+  function setupImportButton() {
+    const fileInput = document.createElement('input');
+    fileInput.type = 'file'; fileInput.accept = '.csv'; fileInput.style.display = 'none';
+    document.body.appendChild(fileInput);
+    document.getElementById('btnImportReport').addEventListener('click', () => fileInput.click());
+    fileInput.addEventListener('change', (e) => {
+      const file = e.target.files[0];
+      if (!file) return;
+      const reader = new FileReader();
+      reader.onload = (ev) => { try { importFromCSV(ev.target.result); } catch(err) { toast('導入失敗: '+err.message); } finally { fileInput.value = ''; } };
+      reader.readAsText(file, 'UTF-8');
+    });
   }
-}, { passive: true });
 
-// ---------- 鍵盤左右鍵支援 ----------
-document.addEventListener('keydown', e => {
-  if (e.key === 'ArrowLeft')  { curIdx = (curIdx - 1 + HOSTS.length) % HOSTS.length; renderInspection(); }
-  if (e.key === 'ArrowRight') { curIdx = (curIdx + 1) % HOSTS.length;                renderInspection(); }
-});
+  // 事件綁定
+  function bindEvents() {
+    document.querySelectorAll('.filter-btn').forEach(btn=>{ btn.addEventListener('click',()=>{ haptic(6); curFilter=btn.dataset.filter; document.querySelectorAll('.filter-btn').forEach(b=>b.classList.remove('active')); btn.classList.add('active'); const fv={fault:1,abnormal:2,normal:0,all:-1}[curFilter]; document.querySelectorAll('.ch-card').forEach(c=>{ if(fv===-1)c.classList.remove('hidden'); else if(parseInt(c.dataset.state)!==fv)c.classList.add('hidden'); else c.classList.remove('hidden'); }); }); });
+    document.getElementById('btnPrev').addEventListener('click',()=>{ haptic(); curIdx=(curIdx-1+HOSTS.length)%HOSTS.length; renderInspection(); });
+    document.getElementById('btnNext').addEventListener('click',()=>{ haptic(); curIdx=(curIdx+1)%HOSTS.length; renderInspection(); });
+    document.querySelectorAll('.tab').forEach(t=>t.addEventListener('click',()=>{ haptic(6); switchTab(t.dataset.tab); }));
+    document.getElementById('qaAllNormal').addEventListener('click',()=>setAllCurrent(0));
+    document.getElementById('qaAllFault').addEventListener('click',()=>setAllCurrent(1));
+    document.getElementById('qaAllAbnormal').addEventListener('click',()=>setAllCurrent(2));
+    document.getElementById('btnResetCurrent').addEventListener('click',()=>{ if(HOSTS[curIdx].removed){ toast('拆除主機無法重置'); return; } if(confirm(`重置 ${HOSTS[curIdx].id} 為全部正常？`)){ haptic(); setAllCurrent(0); } });
+    document.getElementById('btnResetAll').addEventListener('click',()=>{ if(confirm('⚠️ 清除所有點檢記錄，但保留主機清單？')){ haptic(); initStateFromHosts(); renderInspection(); if(currentTab==='overview') renderOverview(); toast('已重置所有主機狀態'); } });
+    document.getElementById('btnExportFull').addEventListener('click',()=>exportHostSheet());
+    // 手勢滑動
+    let tsx=0,tsy=0,tActive=false; const gridEl=document.getElementById('chGrid');
+    gridEl.addEventListener('touchstart',e=>{ if(e.touches.length===1){ tsx=e.touches[0].clientX; tsy=e.touches[0].clientY; tActive=true; } },{passive:true});
+    gridEl.addEventListener('touchmove',e=>{ if(tActive&&e.touches.length===1){ const dx=e.touches[0].clientX-tsx, dy=Math.abs(e.touches[0].clientY-tsy); if(Math.abs(dx)>dy&&Math.abs(dx)>15)e.preventDefault(); }},{passive:false});
+    gridEl.addEventListener('touchend',e=>{ if(!tActive)return; tActive=false; const dx=e.changedTouches[0].clientX-tsx; const dy=Math.abs(e.changedTouches[0].clientY-tsy); if(Math.abs(dx)>60&&dy<50){ haptic(); curIdx=dx<0?(curIdx+1)%HOSTS.length:(curIdx-1+HOSTS.length)%HOSTS.length; renderInspection(); } });
+    document.addEventListener('keydown',e=>{ if(e.key==='ArrowLeft'){ curIdx=(curIdx-1+HOSTS.length)%HOSTS.length; renderInspection(); } if(e.key==='ArrowRight'){ curIdx=(curIdx+1)%HOSTS.length; renderInspection(); } });
+  }
 
-// ---------- 初始化 ----------
-loadState();
-renderHeader();
-renderInspection();
-
-// 每分鐘更新日期
-setInterval(renderHeader, 60000);
+  // 初始化
+  function init() {
+    loadFull();
+    renderHeader();
+    bindEvents();
+    setupImportButton();
+    switchTab('inspection');
+    setInterval(renderHeader, 60000);
+  }
+  init();
 </script>
 </body>
 </html>
