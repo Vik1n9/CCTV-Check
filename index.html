@@ -373,13 +373,15 @@
 </div>
 
 <script>
-// ======================= 主機設定 - 完全依照 Excel 資料 (包含拆除主機 G, H, I) =======================
+// ======================= 主機設定 - 依照活頁簿修正 C/D/E 總通道數 =======================
+// 依據使用者要求: C應為32(未扣除拆除), D為24(未扣除拆除), E為32(未扣除拆除)
+// 其他主機維持原Excel總數，G/H/I拆除主機保持0通道
 const HOSTS = [
   { id: "A", channels: 31, removed: false },
   { id: "B", channels: 32, removed: false },
-  { id: "C", channels: 31, removed: false },
-  { id: "D", channels: 22, removed: false },
-  { id: "E", channels: 30, removed: false },
+  { id: "C", channels: 32, removed: false },   // 原31 → 32 (未扣除拆除通道23)
+  { id: "D", channels: 24, removed: false },   // 原22 → 24 (未扣除拆除通道4)
+  { id: "E", channels: 32, removed: false },   // 原30 → 32 (未扣除拆除通道31)
   { id: "F", channels: 18, removed: false },
   { id: "G", channels: 0, removed: true },
   { id: "H", channels: 0, removed: true },
@@ -416,8 +418,9 @@ function loadState() {
     const parsed = raw ? JSON.parse(raw) : {};
     for (const h of HOSTS) {
       if (!parsed[h.id]) parsed[h.id] = {};
-      for (let ch = 1; ch <= h.channels; ch++)
+      for (let ch = 1; ch <= h.channels; ch++) {
         if (parsed[h.id][ch] === undefined) parsed[h.id][ch] = 0;
+      }
     }
     state = parsed;
   } catch { initState(); }
@@ -469,7 +472,6 @@ function renderHeader() {
 function renderInspection() {
   renderHostNav();
   renderGrid();
-  // 根據當前主機是否拆除，禁用快速操作按鈕
   const currentHost = HOSTS[curIdx];
   const btns = ['qaAllNormal', 'qaAllFault', 'qaAllAbnormal', 'btnResetCurrent'];
   btns.forEach(id => {
@@ -530,7 +532,6 @@ function renderGrid() {
   grid.innerHTML = '';
   
   if (h.removed) {
-    // 顯示拆除提示
     const msgDiv = document.createElement('div');
     msgDiv.className = 'removed-message';
     msgDiv.innerHTML = '🚧 此主機已拆除，無迴路資料 🚧';
@@ -659,11 +660,21 @@ function renderOverview() {
 }
 
 function switchTab(tab) {
-  ['inspection', 'overview'].forEach(t => {
-    document.getElementById(`tab-btn-${t}`).classList.toggle('active', t === tab);
-    document.getElementById(`pane-${t}`).style.display = t === tab ? 'block' : 'none';
-  });
-  if (tab === 'overview') renderOverview();
+  const inspectionPane = document.getElementById('pane-inspection');
+  const overviewPane = document.getElementById('pane-overview');
+  const tabs = document.querySelectorAll('.tab');
+  if (tab === 'inspection') {
+    tabs[0].classList.add('active');
+    tabs[1].classList.remove('active');
+    inspectionPane.style.display = 'block';
+    overviewPane.style.display = 'none';
+  } else {
+    tabs[0].classList.remove('active');
+    tabs[1].classList.add('active');
+    inspectionPane.style.display = 'none';
+    overviewPane.style.display = 'block';
+    renderOverview();
+  }
 }
 
 function setAllCurrent(val) {
@@ -681,7 +692,6 @@ function setAllCurrent(val) {
   toast(`${h.id} 已全設為「${labels[val]}」`);
 }
 
-// 匯出主機報表 (每主機一行，故障編號逗號分隔，備註內含異常通道)
 function exportHostSheet() {
   const rows = [];
   rows.push(['主機', 'CH總數', '故障編號', '故障數', '正常總數', '備註']);
@@ -694,16 +704,10 @@ function exportHostSheet() {
     const abnormalList = getAbnormalChannels(h.id);
     const faultStr = faultList.join(',');
     const faultCount = faultList.length;
-    const abnormalCount = abnormalList.length;
     const stats = hostStats(h);
-    const normalTotal = stats.total - faultCount - abnormalCount;
-    
+    const normalTotal = stats.total - faultCount - abnormalList.length;
     let remark = '';
-    if (abnormalList.length > 0) {
-      remark = `異常通道: ${abnormalList.join(',')}；待填寫原因`;
-    } else {
-      remark = '';
-    }
+    if (abnormalList.length > 0) remark = `異常通道: ${abnormalList.join(',')}；待填寫原因`;
     rows.push([
       h.id,
       stats.total,
