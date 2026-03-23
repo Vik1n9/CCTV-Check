@@ -17,7 +17,8 @@
       --primary:   #1f6feb;
       --normal:    #2ea043;
       --fault:     #da3633;
-      --abnormal:  #e67e22;   /* 異常使用醒目橙色 */
+      --abnormal:  #e67e22;
+      --removed:   #6e7681;
       --radius:    18px;
     }
 
@@ -103,6 +104,7 @@
     .host-dot.current   { width: 22px; background: var(--primary); }
     .host-dot.has-fault { background: var(--fault); }
     .host-dot.has-abnormal:not(.has-fault) { background: var(--abnormal); }
+    .host-dot.removed   { background: var(--removed); cursor: default; opacity: 0.6; }
     .host-dot.all-ok    { background: var(--normal); }
 
     .stats-strip { display: grid; grid-template-columns: repeat(3,1fr); gap: 8px; margin-bottom: 10px; }
@@ -138,12 +140,15 @@
     .legend-dot { width: 10px; height: 10px; border-radius: 50%; }
 
     .ch-grid {
-      display: grid;
-      grid-template-columns: repeat(auto-fill, minmax(58px, 1fr));
-      gap: 7px;
       background: var(--surface); border: 1px solid var(--border);
       border-radius: var(--radius); padding: 12px;
       margin-bottom: 10px;
+      min-height: 200px;
+    }
+    .grid-normal {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(58px, 1fr));
+      gap: 7px;
     }
     .ch-card {
       aspect-ratio: 1;
@@ -168,6 +173,15 @@
       background: linear-gradient(135deg, rgba(255,255,255,.12) 0%, transparent 60%);
       pointer-events: none;
     }
+    .removed-message {
+      text-align: center;
+      padding: 40px 20px;
+      color: var(--muted);
+      font-size: 0.9rem;
+      background: var(--surface2);
+      border-radius: 12px;
+      border: 1px dashed var(--border);
+    }
 
     .section-label {
       font-size: 0.68rem; font-weight: 700;
@@ -190,6 +204,11 @@
     .btn-abnormal { background: rgba(230,126,34,.15); color: #f0a65a; border-color: rgba(230,126,34,.3); }
     .btn-ghost    { background: var(--surface2); color: var(--text); border-color: var(--border); }
     .btn-danger   { background: rgba(218,54,51,.1); color: #f85149; border-color: rgba(218,54,51,.3); }
+    .btn:disabled {
+      opacity: 0.5;
+      cursor: not-allowed;
+      transform: none;
+    }
 
     .bottom-bar {
       position: fixed; bottom: 0; left: 0; right: 0;
@@ -221,6 +240,10 @@
     }
     .overview-card:active { transform: scale(0.97); }
     .overview-card.has-issue { border-color: rgba(218,54,51,.4); }
+    .overview-card.removed-card {
+      opacity: 0.7;
+      border-color: var(--removed);
+    }
     .ov-host-name {
       font-family: 'JetBrains Mono', monospace;
       font-size: 0.92rem; font-weight: 700; margin-bottom: 6px;
@@ -233,6 +256,12 @@
     .ov-counts { display: flex; gap: 8px; font-size: 0.7rem; color: var(--muted); }
     .ov-count  { display: flex; align-items: center; gap: 3px; }
     .ov-count-dot { width: 6px; height: 6px; border-radius: 50%; }
+    .removed-badge {
+      font-size: 0.7rem;
+      color: var(--removed);
+      margin-top: 6px;
+      text-align: center;
+    }
 
     .toast {
       position: fixed; top: 80px; left: 50%;
@@ -246,13 +275,13 @@
     .toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
 
     @media (max-width: 380px) {
-      .ch-grid { grid-template-columns: repeat(auto-fill, minmax(50px, 1fr)); gap: 5px; }
+      .grid-normal { grid-template-columns: repeat(auto-fill, minmax(50px, 1fr)); gap: 5px; }
       .ch-card { font-size: 0.82rem; border-radius: 10px; }
       .stat-num { font-size: 1.5rem; }
     }
     @media (min-width: 600px) {
       .overview-grid { grid-template-columns: repeat(3,1fr); }
-      .ch-grid { grid-template-columns: repeat(auto-fill, minmax(66px, 1fr)); }
+      .grid-normal { grid-template-columns: repeat(auto-fill, minmax(66px, 1fr)); }
     }
   </style>
 </head>
@@ -344,42 +373,39 @@
 </div>
 
 <script>
-// ======================= 主機設定 (可擴充) =======================
+// ======================= 主機設定 - 完全依照 Excel 資料 (包含拆除主機 G, H, I) =======================
 const HOSTS = [
-  { id: "CAM-01", channels: 59 },
-  { id: "CAM-02", channels: 48 },
-  { id: "CAM-03", channels: 32 },
-  { id: "CAM-04", channels: 24 },
-  { id: "CAM-05", channels: 12 },
-  { id: "CAM-06", channels: 36 },
-  { id: "CAM-07", channels: 59 },
-  { id: "CAM-08", channels: 16 },
-  { id: "CAM-09", channels: 24 },
-  { id: "CAM-10", channels: 48 },
-  { id: "CAM-11", channels: 32 },
-  { id: "CAM-12", channels: 20 },
-  { id: "CAM-13", channels: 12 },
-  { id: "CAM-14", channels: 36 },
-  { id: "CAM-15", channels: 24 },
-  { id: "CAM-16", channels: 48 },
-  { id: "CAM-17", channels: 59 },
-  { id: "CAM-18", channels: 16 },
-  { id: "CAM-19", channels: 32 },
-  { id: "CAM-20", channels: 24 },
-  { id: "CAM-21", channels: 12 },
-  { id: "CAM-22", channels: 36 },
-  { id: "CAM-23", channels: 48 },
-  { id: "CAM-24", channels: 24 },
+  { id: "A", channels: 31, removed: false },
+  { id: "B", channels: 32, removed: false },
+  { id: "C", channels: 31, removed: false },
+  { id: "D", channels: 22, removed: false },
+  { id: "E", channels: 30, removed: false },
+  { id: "F", channels: 18, removed: false },
+  { id: "G", channels: 0, removed: true },
+  { id: "H", channels: 0, removed: true },
+  { id: "I", channels: 0, removed: true },
+  { id: "J", channels: 32, removed: false },
+  { id: "K1", channels: 20, removed: false },
+  { id: "K2", channels: 18, removed: false },
+  { id: "L", channels: 39, removed: false },
+  { id: "M", channels: 59, removed: false },
+  { id: "N", channels: 52, removed: false },
+  { id: "O", channels: 51, removed: false },
+  { id: "P", channels: 40, removed: false },
+  { id: "Q1", channels: 16, removed: false },
+  { id: "Q2", channels: 25, removed: false },
+  { id: "R", channels: 49, removed: false },
+  { id: "S", channels: 12, removed: false }
 ];
 
 const STATE_INFO = {
   0: { label: '正常',  color: '#2ea043' },
   1: { label: '故障',  color: '#da3633' },
-  2: { label: '異常', color: '#e67e22' },   // 原無訊號改為異常
+  2: { label: '異常', color: '#e67e22' }
 };
 
-const STORAGE_KEY = 'cctv_v2_state';
-let state = {};          // { "CAM-01": { 1:0, 2:1 ... } }
+const STORAGE_KEY = 'cctv_excel_v2_state';
+let state = {};
 let curIdx = 0;
 let curFilter = 'all';
 
@@ -420,19 +446,19 @@ function hostStats(host) {
   return { normal, fault, abnormal, total: host.channels };
 }
 
-// 獲取故障編號列表 (狀態1) , 異常編號列表 (狀態2)
 function getFaultChannels(hostId) { return getChannelsByState(hostId, 1); }
 function getAbnormalChannels(hostId) { return getChannelsByState(hostId, 2); }
 function getChannelsByState(hostId, targetState) {
   const hostState = state[hostId] || {};
   const list = [];
-  for (let ch = 1; ch <= (HOSTS.find(h=>h.id===hostId)?.channels || 0); ch++) {
+  const host = HOSTS.find(h => h.id === hostId);
+  if (!host || host.channels === 0) return list;
+  for (let ch = 1; ch <= host.channels; ch++) {
     if ((hostState[ch] ?? 0) === targetState) list.push(ch);
   }
   return list;
 }
 
-// 更新標頭日期
 function renderHeader() {
   const d = new Date();
   const pad = n => String(n).padStart(2, '0');
@@ -440,17 +466,35 @@ function renderHeader() {
     `${d.getFullYear()}/${pad(d.getMonth()+1)}/${pad(d.getDate())} 週${['日','一','二','三','四','五','六'][d.getDay()]}`;
 }
 
-// 點檢面板渲染
 function renderInspection() {
   renderHostNav();
   renderGrid();
+  // 根據當前主機是否拆除，禁用快速操作按鈕
+  const currentHost = HOSTS[curIdx];
+  const btns = ['qaAllNormal', 'qaAllFault', 'qaAllAbnormal', 'btnResetCurrent'];
+  btns.forEach(id => {
+    const btn = document.getElementById(id);
+    if (currentHost.removed) {
+      btn.disabled = true;
+      btn.style.opacity = '0.5';
+      btn.style.cursor = 'not-allowed';
+    } else {
+      btn.disabled = false;
+      btn.style.opacity = '';
+      btn.style.cursor = 'pointer';
+    }
+  });
 }
 
 function renderHostNav() {
   const h = HOSTS[curIdx];
   const st = hostStats(h);
   document.getElementById('hostName').textContent = h.id;
-  document.getElementById('hostMeta').textContent = `${h.channels} 迴路　${curIdx + 1} / ${HOSTS.length}`;
+  if (h.removed) {
+    document.getElementById('hostMeta').textContent = `已拆除 (無迴路)`;
+  } else {
+    document.getElementById('hostMeta').textContent = `${h.channels} 迴路　${curIdx + 1} / ${HOSTS.length}`;
+  }
   document.getElementById('statNormal').textContent  = st.normal;
   document.getElementById('statFault').textContent   = st.fault;
   document.getElementById('statAbnormal').textContent = st.abnormal;
@@ -461,24 +505,46 @@ function renderHostNav() {
     const hs = hostStats(hh);
     const dot = document.createElement('div');
     dot.className = 'host-dot';
-    if (i === curIdx) dot.classList.add('current');
-    else if (hs.fault > 0) dot.classList.add('has-fault');
-    else if (hs.abnormal > 0) dot.classList.add('has-abnormal');
-    else dot.classList.add('all-ok');
-    dot.title = hh.id;
-    dot.addEventListener('click', () => { curIdx = i; renderInspection(); });
+    if (hh.removed) {
+      dot.classList.add('removed');
+    } else if (i === curIdx) {
+      dot.classList.add('current');
+    } else if (hs.fault > 0) {
+      dot.classList.add('has-fault');
+    } else if (hs.abnormal > 0) {
+      dot.classList.add('has-abnormal');
+    } else {
+      dot.classList.add('all-ok');
+    }
+    dot.title = hh.id + (hh.removed ? ' (已拆除)' : '');
+    if (!hh.removed) {
+      dot.addEventListener('click', () => { curIdx = i; renderInspection(); });
+    }
     dotsEl.appendChild(dot);
   });
 }
 
 function renderGrid() {
   const h = HOSTS[curIdx];
-  const hs = state[h.id];
   const grid = document.getElementById('chGrid');
   grid.innerHTML = '';
+  
+  if (h.removed) {
+    // 顯示拆除提示
+    const msgDiv = document.createElement('div');
+    msgDiv.className = 'removed-message';
+    msgDiv.innerHTML = '🚧 此主機已拆除，無迴路資料 🚧';
+    grid.appendChild(msgDiv);
+    return;
+  }
+  
+  const hs = state[h.id];
   const filterMap = { fault: 1, abnormal: 2, normal: 0, all: -1 };
   const filterVal = filterMap[curFilter];
-
+  
+  const gridContainer = document.createElement('div');
+  gridContainer.className = 'grid-normal';
+  
   for (let ch = 1; ch <= h.channels; ch++) {
     const v = hs[ch] !== undefined ? hs[ch] : 0;
     const card = document.createElement('div');
@@ -487,7 +553,7 @@ function renderGrid() {
     card.dataset.ch = ch;
     card.textContent = ch;
     if (filterVal !== -1 && v !== filterVal) card.classList.add('hidden');
-
+    
     card.addEventListener('click', () => {
       const next = (parseInt(card.dataset.state) + 1) % 3;
       card.dataset.state = next;
@@ -498,8 +564,9 @@ function renderGrid() {
       if (filterVal !== -1 && next !== filterVal) card.classList.add('hidden');
       else card.classList.remove('hidden');
     });
-    grid.appendChild(card);
+    gridContainer.appendChild(card);
   }
+  grid.appendChild(gridContainer);
 }
 
 function updateStatsOnly() {
@@ -510,7 +577,12 @@ function updateStatsOnly() {
 }
 function updateDotsOnly() {
   document.querySelectorAll('.host-dot').forEach((dot, i) => {
-    const hs = hostStats(HOSTS[i]);
+    const hh = HOSTS[i];
+    if (hh.removed) {
+      dot.className = 'host-dot removed';
+      return;
+    }
+    const hs = hostStats(hh);
     dot.className = 'host-dot';
     if (i === curIdx) dot.classList.add('current');
     else if (hs.fault > 0) dot.classList.add('has-fault');
@@ -519,14 +591,16 @@ function updateDotsOnly() {
   });
 }
 
-// 總覽
 function renderOverview() {
   let totalNormal = 0, totalFault = 0, totalAbnormal = 0;
+  let totalCh = 0;
   HOSTS.forEach(h => {
     const s = hostStats(h);
-    totalNormal += s.normal; totalFault += s.fault; totalAbnormal += s.abnormal;
+    totalNormal += s.normal;
+    totalFault += s.fault;
+    totalAbnormal += s.abnormal;
+    totalCh += s.total;
   });
-  const grandTotal = totalNormal + totalFault + totalAbnormal;
 
   document.getElementById('overviewSummary').innerHTML = `
     <div class="section-label" style="margin-bottom:10px">全場統計</div>
@@ -534,12 +608,12 @@ function renderOverview() {
       <span class="ov-stat"><div class="ov-dot" style="background:var(--normal)"></div>正常 ${totalNormal}</span>
       <span class="ov-stat"><div class="ov-dot" style="background:var(--fault)"></div>故障 ${totalFault}</span>
       <span class="ov-stat"><div class="ov-dot" style="background:var(--abnormal)"></div>異常 ${totalAbnormal}</span>
-      <span class="ov-stat" style="color:var(--muted)">共 ${grandTotal} 迴路</span>
+      <span class="ov-stat" style="color:var(--muted)">共 ${totalCh} 迴路</span>
     </div>
     <div style="height:8px;border-radius:4px;overflow:hidden;background:var(--border);display:flex;margin-top:12px">
-      <div style="width:${(totalNormal/grandTotal*100).toFixed(1)}%;background:var(--normal)"></div>
-      <div style="width:${(totalFault/grandTotal*100).toFixed(1)}%;background:var(--fault)"></div>
-      <div style="width:${(totalAbnormal/grandTotal*100).toFixed(1)}%;background:var(--abnormal)"></div>
+      <div style="width:${totalCh ? (totalNormal/totalCh*100).toFixed(1) : 0}%;background:var(--normal)"></div>
+      <div style="width:${totalCh ? (totalFault/totalCh*100).toFixed(1) : 0}%;background:var(--fault)"></div>
+      <div style="width:${totalCh ? (totalAbnormal/totalCh*100).toFixed(1) : 0}%;background:var(--abnormal)"></div>
     </div>
   `;
 
@@ -547,32 +621,43 @@ function renderOverview() {
   grid.innerHTML = '';
   HOSTS.forEach((h, i) => {
     const s = hostStats(h);
-    const np = (s.normal   / s.total * 100).toFixed(1);
-    const fp = (s.fault    / s.total * 100).toFixed(1);
-    const ap = (s.abnormal / s.total * 100).toFixed(1);
-    const hasIssue = s.fault > 0 || s.abnormal > 0;
     const card = document.createElement('div');
-    card.className = 'overview-card' + (hasIssue ? ' has-issue' : '');
-    card.innerHTML = `
-      <div class="ov-host-name">${h.id}</div>
-      <div class="ov-bar">
-        <div class="ov-bar-seg" style="width:${np}%;background:var(--normal)"></div>
-        <div class="ov-bar-seg" style="width:${fp}%;background:var(--fault)"></div>
-        <div class="ov-bar-seg" style="width:${ap}%;background:var(--abnormal)"></div>
-      </div>
-      <div class="ov-counts">
-        <span class="ov-count"><div class="ov-count-dot" style="background:var(--normal)"></div>${s.normal}</span>
-        <span class="ov-count"><div class="ov-count-dot" style="background:var(--fault)"></div>${s.fault}</span>
-        <span class="ov-count"><div class="ov-count-dot" style="background:var(--abnormal)"></div>${s.abnormal}</span>
-        <span style="margin-left:auto">${s.total}CH</span>
-      </div>
-    `;
+    card.className = 'overview-card';
+    if (h.removed) card.classList.add('removed-card');
+    else if (s.fault > 0 || s.abnormal > 0) card.classList.add('has-issue');
+    
+    if (h.removed) {
+      card.innerHTML = `
+        <div class="ov-host-name">${h.id}</div>
+        <div class="removed-badge">🚧 主機已拆除</div>
+        <div class="ov-counts" style="margin-top:6px">
+          <span class="ov-count">迴路數: 0</span>
+        </div>
+      `;
+    } else {
+      const np = (s.normal   / s.total * 100).toFixed(1);
+      const fp = (s.fault    / s.total * 100).toFixed(1);
+      const ap = (s.abnormal / s.total * 100).toFixed(1);
+      card.innerHTML = `
+        <div class="ov-host-name">${h.id}</div>
+        <div class="ov-bar">
+          <div class="ov-bar-seg" style="width:${np}%;background:var(--normal)"></div>
+          <div class="ov-bar-seg" style="width:${fp}%;background:var(--fault)"></div>
+          <div class="ov-bar-seg" style="width:${ap}%;background:var(--abnormal)"></div>
+        </div>
+        <div class="ov-counts">
+          <span class="ov-count"><div class="ov-count-dot" style="background:var(--normal)"></div>${s.normal}</span>
+          <span class="ov-count"><div class="ov-count-dot" style="background:var(--fault)"></div>${s.fault}</span>
+          <span class="ov-count"><div class="ov-count-dot" style="background:var(--abnormal)"></div>${s.abnormal}</span>
+          <span style="margin-left:auto">${s.total}CH</span>
+        </div>
+      `;
+    }
     card.addEventListener('click', () => { curIdx = i; switchTab('inspection'); renderInspection(); });
     grid.appendChild(card);
   });
 }
 
-// 切換頁籤
 function switchTab(tab) {
   ['inspection', 'overview'].forEach(t => {
     document.getElementById(`tab-btn-${t}`).classList.toggle('active', t === tab);
@@ -581,9 +666,12 @@ function switchTab(tab) {
   if (tab === 'overview') renderOverview();
 }
 
-// 快速全設
 function setAllCurrent(val) {
   const h = HOSTS[curIdx];
+  if (h.removed) {
+    toast('此主機已拆除，無法設定狀態');
+    return;
+  }
   const labels = ['正常', '故障', '異常'];
   for (let ch = 1; ch <= h.channels; ch++) state[h.id][ch] = val;
   saveState();
@@ -598,13 +686,17 @@ function exportHostSheet() {
   const rows = [];
   rows.push(['主機', 'CH總數', '故障編號', '故障數', '正常總數', '備註']);
   for (const h of HOSTS) {
+    if (h.removed) {
+      rows.push([h.id, 0, '', 0, 0, '主機拆除']);
+      continue;
+    }
     const faultList = getFaultChannels(h.id);
     const abnormalList = getAbnormalChannels(h.id);
     const faultStr = faultList.join(',');
     const faultCount = faultList.length;
     const abnormalCount = abnormalList.length;
     const stats = hostStats(h);
-    const normalTotal = stats.total - faultCount - abnormalCount;  // 正常總數 = 總數 - 故障 - 異常
+    const normalTotal = stats.total - faultCount - abnormalCount;
     
     let remark = '';
     if (abnormalList.length > 0) {
@@ -621,9 +713,8 @@ function exportHostSheet() {
       remark
     ]);
   }
-  // 加總列 (選配)
   const totalCh = HOSTS.reduce((s,h)=>s+h.channels,0);
-  const totalFaultSum = rows.slice(1).reduce((s,r)=>s+(Number(r[3])||0),0);
+  const totalFaultSum = rows.slice(1).filter(r => !isNaN(Number(r[3]))).reduce((s,r)=>s+(Number(r[3])||0),0);
   const totalAbnormalCh = HOSTS.reduce((s,h)=>s+getAbnormalChannels(h.id).length,0);
   const totalNormalSum = totalCh - totalFaultSum - totalAbnormalCh;
   rows.push(['全場總計', totalCh, '', totalFaultSum, totalNormalSum, `異常總數:${totalAbnormalCh}`]);
@@ -640,12 +731,12 @@ function exportHostSheet() {
   toast('已匯出主機報表 (故障編號+異常備註)');
 }
 
-// 匯出異常清單 (明細: 列出所有故障+異常的通道)
 function exportFaultList() {
   const rows = [['CCTV 異常清單', `匯出日期: ${new Date().toLocaleString()}`], []];
   rows.push(['主機ID', '迴路編號', '狀態類型']);
   let count = 0;
   for (const h of HOSTS) {
+    if (h.removed) continue;
     const hs = state[h.id] || {};
     for (let ch = 1; ch <= h.channels; ch++) {
       const v = hs[ch] ?? 0;
@@ -666,7 +757,6 @@ function exportFaultList() {
   toast(`已匯出 ${count} 筆異常明細`);
 }
 
-// 輔助與事件綁定
 function toast(msg) {
   const el = document.getElementById('toast');
   el.textContent = msg;
@@ -675,7 +765,7 @@ function toast(msg) {
   el._t = setTimeout(() => el.classList.remove('show'), 2600);
 }
 
-// 初始化事件
+// 事件綁定
 document.querySelectorAll('.filter-btn').forEach(btn => {
   btn.addEventListener('click', () => {
     curFilter = btn.dataset.filter;
@@ -683,7 +773,9 @@ document.querySelectorAll('.filter-btn').forEach(btn => {
     btn.classList.add('active');
     const filterMap = { fault: 1, abnormal: 2, normal: 0, all: -1 };
     const fv = filterMap[curFilter];
-    document.querySelectorAll('.ch-card').forEach(card => {
+    const grid = document.getElementById('chGrid');
+    const cards = grid.querySelectorAll('.ch-card');
+    cards.forEach(card => {
       if (fv === -1) card.classList.remove('hidden');
       else if (parseInt(card.dataset.state) !== fv) card.classList.add('hidden');
       else card.classList.remove('hidden');
@@ -706,7 +798,9 @@ document.getElementById('qaAllNormal').addEventListener('click', () => setAllCur
 document.getElementById('qaAllFault').addEventListener('click', () => setAllCurrent(1));
 document.getElementById('qaAllAbnormal').addEventListener('click', () => setAllCurrent(2));
 document.getElementById('btnResetCurrent').addEventListener('click', () => {
-  if (confirm(`重置 ${HOSTS[curIdx].id} 為全部正常？`)) setAllCurrent(0);
+  const h = HOSTS[curIdx];
+  if (h.removed) { toast('拆除主機無法重置'); return; }
+  if (confirm(`重置 ${h.id} 為全部正常？`)) setAllCurrent(0);
 });
 document.getElementById('btnResetAll').addEventListener('click', () => {
   if (confirm('⚠️ 清除所有主機點檢記錄？無法復原。')) { initState(); saveState(); renderInspection(); toast('已重置全部主機'); }
