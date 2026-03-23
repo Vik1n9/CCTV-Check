@@ -1,0 +1,736 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+  <title>CCTV 點檢系統 | 異常記錄管理</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;600;700&family=Outfit:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --bg:        #0d1117;
+      --surface:   #161b22;
+      --surface2:  #1c2330;
+      --border:    #30363d;
+      --text:      #e6edf3;
+      --muted:     #7d8590;
+      --primary:   #1f6feb;
+      --normal:    #2ea043;
+      --fault:     #da3633;
+      --abnormal:  #e67e22;   /* 異常使用醒目橙色 */
+      --radius:    18px;
+    }
+
+    * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; margin: 0; padding: 0; }
+
+    body {
+      font-family: 'Outfit', system-ui, sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      min-height: 100dvh;
+      padding-bottom: 88px;
+    }
+
+    .header {
+      background: var(--surface);
+      border-bottom: 1px solid var(--border);
+      padding: 14px 18px;
+      padding-top: max(14px, env(safe-area-inset-top));
+      position: sticky; top: 0; z-index: 100;
+      display: flex; justify-content: space-between; align-items: center;
+    }
+    .header-logo {
+      font-size: 1rem; font-weight: 800; letter-spacing: 0.04em;
+      display: flex; align-items: center; gap: 8px;
+    }
+    .header-logo .dot {
+      width: 10px; height: 10px; border-radius: 50%;
+      background: var(--fault);
+      animation: pulse 1.8s ease-in-out infinite;
+    }
+    @keyframes pulse { 0%,100%{opacity:1;transform:scale(1)} 50%{opacity:.5;transform:scale(1.3)} }
+    .header-date {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 0.72rem; color: var(--muted);
+    }
+
+    .tab-bar {
+      display: flex; gap: 0;
+      background: var(--surface); border-bottom: 1px solid var(--border);
+    }
+    .tab {
+      flex: 1; text-align: center; padding: 12px 0;
+      font-weight: 700; font-size: 0.88rem;
+      cursor: pointer; color: var(--muted);
+      border-bottom: 2px solid transparent;
+      transition: all .2s; user-select: none;
+    }
+    .tab.active { color: var(--primary); border-color: var(--primary); }
+
+    .content { padding: 14px 14px 0; max-width: 820px; margin: 0 auto; }
+
+    .host-nav {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 14px 14px 10px;
+      margin-bottom: 10px;
+    }
+    .host-nav-row { display: flex; align-items: center; gap: 10px; margin-bottom: 12px; }
+    .nav-btn {
+      width: 44px; height: 44px; flex-shrink: 0;
+      background: var(--surface2); border: 1px solid var(--border);
+      border-radius: 12px; color: var(--text);
+      font-size: 1rem; cursor: pointer;
+      display: flex; align-items: center; justify-content: center;
+      transition: all .15s; font-family: inherit;
+    }
+    .nav-btn:active { background: var(--border); transform: scale(0.93); }
+    .host-info { flex: 1; text-align: center; }
+    .host-name {
+      font-size: 1.5rem; font-weight: 800;
+      font-family: 'JetBrains Mono', monospace;
+      letter-spacing: 0.06em; line-height: 1;
+    }
+    .host-meta { font-size: 0.72rem; color: var(--muted); margin-top: 3px; }
+
+    .host-dots { display: flex; gap: 4px; justify-content: center; flex-wrap: wrap; }
+    .host-dot {
+      width: 8px; height: 8px; border-radius: 4px;
+      background: var(--border); cursor: pointer;
+      transition: all .15s;
+    }
+    .host-dot.current   { width: 22px; background: var(--primary); }
+    .host-dot.has-fault { background: var(--fault); }
+    .host-dot.has-abnormal:not(.has-fault) { background: var(--abnormal); }
+    .host-dot.all-ok    { background: var(--normal); }
+
+    .stats-strip { display: grid; grid-template-columns: repeat(3,1fr); gap: 8px; margin-bottom: 10px; }
+    .stat-card {
+      background: var(--surface); border: 1px solid var(--border);
+      border-radius: 14px; padding: 12px 8px; text-align: center;
+    }
+    .stat-num {
+      font-size: 1.8rem; font-weight: 800;
+      font-family: 'JetBrains Mono', monospace; line-height: 1;
+    }
+    .stat-label { font-size: 0.68rem; color: var(--muted); margin-top: 3px; }
+    .stat-card.s-normal  .stat-num { color: var(--normal); }
+    .stat-card.s-fault   .stat-num { color: var(--fault); }
+    .stat-card.s-abnormal .stat-num { color: var(--abnormal); }
+
+    .filter-row { display: flex; gap: 6px; margin-bottom: 10px; }
+    .filter-btn {
+      flex: 1; padding: 8px 4px;
+      border-radius: 10px; border: 1px solid var(--border);
+      background: var(--surface); font-size: 0.78rem; font-weight: 600;
+      color: var(--muted); cursor: pointer; text-align: center;
+      transition: all .15s; font-family: inherit;
+    }
+    .filter-btn.active { border-color: var(--primary); color: var(--primary); background: rgba(31,111,235,.12); }
+    .filter-btn:active { transform: scale(0.95); }
+
+    .legend {
+      display: flex; gap: 14px; justify-content: center;
+      margin-bottom: 10px; flex-wrap: wrap;
+    }
+    .legend-item { display: flex; align-items: center; gap: 5px; font-size: 0.75rem; color: var(--muted); }
+    .legend-dot { width: 10px; height: 10px; border-radius: 50%; }
+
+    .ch-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(58px, 1fr));
+      gap: 7px;
+      background: var(--surface); border: 1px solid var(--border);
+      border-radius: var(--radius); padding: 12px;
+      margin-bottom: 10px;
+    }
+    .ch-card {
+      aspect-ratio: 1;
+      border-radius: 12px;
+      display: flex; flex-direction: column;
+      align-items: center; justify-content: center;
+      font-weight: 700; font-size: 0.9rem;
+      font-family: 'JetBrains Mono', monospace;
+      color: white; cursor: pointer;
+      user-select: none; touch-action: manipulation;
+      transition: transform .08s ease;
+      position: relative; overflow: hidden;
+    }
+    .ch-card[data-state="0"] { background: var(--normal); }
+    .ch-card[data-state="1"] { background: var(--fault); }
+    .ch-card[data-state="2"] { background: var(--abnormal); }
+    .ch-card.hidden { display: none; }
+    .ch-card:active { transform: scale(0.87); }
+    .ch-card[data-state="1"]::before {
+      content: '';
+      position: absolute; inset: 0;
+      background: linear-gradient(135deg, rgba(255,255,255,.12) 0%, transparent 60%);
+      pointer-events: none;
+    }
+
+    .section-label {
+      font-size: 0.68rem; font-weight: 700;
+      text-transform: uppercase; letter-spacing: .1em;
+      color: var(--muted); margin-bottom: 8px;
+    }
+    .quick-row { display: flex; gap: 7px; margin-bottom: 7px; }
+    .btn {
+      flex: 1; padding: 11px 8px;
+      border-radius: 12px; border: 1px solid var(--border);
+      font-family: 'Outfit', system-ui, sans-serif;
+      font-weight: 600; font-size: 0.82rem;
+      cursor: pointer; transition: all .15s;
+      white-space: nowrap; text-align: center;
+    }
+    .btn:active { transform: scale(0.95); }
+    .btn-primary  { background: var(--primary); color: white; border-color: var(--primary); }
+    .btn-normal   { background: rgba(46,160,67,.15); color: #3fb950; border-color: rgba(46,160,67,.3); }
+    .btn-fault    { background: rgba(218,54,51,.15); color: #f85149; border-color: rgba(218,54,51,.3); }
+    .btn-abnormal { background: rgba(230,126,34,.15); color: #f0a65a; border-color: rgba(230,126,34,.3); }
+    .btn-ghost    { background: var(--surface2); color: var(--text); border-color: var(--border); }
+    .btn-danger   { background: rgba(218,54,51,.1); color: #f85149; border-color: rgba(218,54,51,.3); }
+
+    .bottom-bar {
+      position: fixed; bottom: 0; left: 0; right: 0;
+      background: var(--surface); border-top: 1px solid var(--border);
+      padding: 10px 14px;
+      padding-bottom: max(10px, env(safe-area-inset-bottom));
+      display: flex; gap: 8px; z-index: 100;
+    }
+    .bottom-bar .btn { flex: 1; padding: 13px 8px; font-size: 0.88rem; }
+
+    .overview-summary {
+      background: var(--surface); border: 1px solid var(--border);
+      border-radius: var(--radius); padding: 14px; margin-bottom: 12px;
+    }
+    .overview-summary-row {
+      display: flex; gap: 8px; justify-content: center; flex-wrap: wrap;
+    }
+    .ov-stat {
+      display: flex; align-items: center; gap: 5px;
+      font-size: 0.85rem; font-weight: 600;
+    }
+    .ov-dot { width: 10px; height: 10px; border-radius: 50%; }
+
+    .overview-grid { display: grid; grid-template-columns: repeat(2,1fr); gap: 8px; }
+    .overview-card {
+      background: var(--surface); border: 1px solid var(--border);
+      border-radius: 14px; padding: 12px; cursor: pointer;
+      transition: all .15s;
+    }
+    .overview-card:active { transform: scale(0.97); }
+    .overview-card.has-issue { border-color: rgba(218,54,51,.4); }
+    .ov-host-name {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 0.92rem; font-weight: 700; margin-bottom: 6px;
+    }
+    .ov-bar {
+      height: 5px; border-radius: 3px; overflow: hidden;
+      background: var(--border); display: flex; margin-bottom: 6px;
+    }
+    .ov-bar-seg { transition: width .3s ease; }
+    .ov-counts { display: flex; gap: 8px; font-size: 0.7rem; color: var(--muted); }
+    .ov-count  { display: flex; align-items: center; gap: 3px; }
+    .ov-count-dot { width: 6px; height: 6px; border-radius: 50%; }
+
+    .toast {
+      position: fixed; top: 80px; left: 50%;
+      transform: translateX(-50%) translateY(-12px);
+      background: var(--text); color: var(--bg);
+      padding: 9px 20px; border-radius: 30px;
+      font-size: 0.82rem; font-weight: 600;
+      opacity: 0; transition: all .25s; z-index: 999;
+      white-space: nowrap; pointer-events: none;
+    }
+    .toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
+
+    @media (max-width: 380px) {
+      .ch-grid { grid-template-columns: repeat(auto-fill, minmax(50px, 1fr)); gap: 5px; }
+      .ch-card { font-size: 0.82rem; border-radius: 10px; }
+      .stat-num { font-size: 1.5rem; }
+    }
+    @media (min-width: 600px) {
+      .overview-grid { grid-template-columns: repeat(3,1fr); }
+      .ch-grid { grid-template-columns: repeat(auto-fill, minmax(66px, 1fr)); }
+    }
+  </style>
+</head>
+<body>
+
+<div class="header">
+  <div class="header-logo">
+    <div class="dot"></div>
+    CCTV 點檢系統
+  </div>
+  <div class="header-date" id="headerDate"></div>
+</div>
+
+<div class="tab-bar">
+  <div class="tab active" data-tab="inspection">🔍 點檢</div>
+  <div class="tab" data-tab="overview">📊 總覽</div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<!-- 點檢面板 -->
+<div id="pane-inspection" class="content">
+  <div class="host-nav">
+    <div class="host-nav-row">
+      <button class="nav-btn" id="btnPrev">◀</button>
+      <div class="host-info">
+        <div class="host-name" id="hostName">--</div>
+        <div class="host-meta" id="hostMeta">--</div>
+      </div>
+      <button class="nav-btn" id="btnNext">▶</button>
+    </div>
+    <div class="host-dots" id="hostDots"></div>
+  </div>
+
+  <div class="stats-strip">
+    <div class="stat-card s-normal">
+      <div class="stat-num" id="statNormal">--</div>
+      <div class="stat-label">🟢 正常</div>
+    </div>
+    <div class="stat-card s-fault">
+      <div class="stat-num" id="statFault">--</div>
+      <div class="stat-label">🔴 故障</div>
+    </div>
+    <div class="stat-card s-abnormal">
+      <div class="stat-num" id="statAbnormal">--</div>
+      <div class="stat-label">⚠️ 異常</div>
+    </div>
+  </div>
+
+  <div class="filter-row">
+    <button class="filter-btn active" data-filter="all">全部</button>
+    <button class="filter-btn" data-filter="fault">故障</button>
+    <button class="filter-btn" data-filter="abnormal">異常</button>
+    <button class="filter-btn" data-filter="normal">正常</button>
+  </div>
+
+  <div class="legend">
+    <div class="legend-item"><div class="legend-dot" style="background:var(--normal)"></div>正常</div>
+    <div class="legend-item"><div class="legend-dot" style="background:var(--fault)"></div>故障</div>
+    <div class="legend-item"><div class="legend-dot" style="background:var(--abnormal)"></div>異常</div>
+    <div class="legend-item" style="color:#484f58;font-size:.7rem">↩ 點擊循環切換</div>
+  </div>
+
+  <div id="chGrid" class="ch-grid"></div>
+
+  <div class="section-label">快速全設</div>
+  <div class="quick-row">
+    <button class="btn btn-normal"   id="qaAllNormal">✅ 全正常</button>
+    <button class="btn btn-fault"    id="qaAllFault">❌ 全故障</button>
+    <button class="btn btn-abnormal" id="qaAllAbnormal">⚠️ 全異常</button>
+  </div>
+
+  <div class="section-label">重置操作</div>
+  <div class="quick-row">
+    <button class="btn btn-ghost"  id="btnResetCurrent">🔄 重置當前主機</button>
+    <button class="btn btn-danger" id="btnResetAll">⚠️ 重置全部</button>
+  </div>
+</div>
+
+<!-- 總覽面板 -->
+<div id="pane-overview" class="content" style="display:none">
+  <div class="overview-summary" id="overviewSummary"></div>
+  <div class="overview-grid" id="overviewGrid"></div>
+</div>
+
+<div class="bottom-bar">
+  <button class="btn btn-ghost"    id="btnExportFault">📋 異常清單</button>
+  <button class="btn btn-primary"  id="btnExportFull">📥 主機報表 (Excel格式)</button>
+</div>
+
+<script>
+// ======================= 主機設定 (可擴充) =======================
+const HOSTS = [
+  { id: "CAM-01", channels: 59 },
+  { id: "CAM-02", channels: 48 },
+  { id: "CAM-03", channels: 32 },
+  { id: "CAM-04", channels: 24 },
+  { id: "CAM-05", channels: 12 },
+  { id: "CAM-06", channels: 36 },
+  { id: "CAM-07", channels: 59 },
+  { id: "CAM-08", channels: 16 },
+  { id: "CAM-09", channels: 24 },
+  { id: "CAM-10", channels: 48 },
+  { id: "CAM-11", channels: 32 },
+  { id: "CAM-12", channels: 20 },
+  { id: "CAM-13", channels: 12 },
+  { id: "CAM-14", channels: 36 },
+  { id: "CAM-15", channels: 24 },
+  { id: "CAM-16", channels: 48 },
+  { id: "CAM-17", channels: 59 },
+  { id: "CAM-18", channels: 16 },
+  { id: "CAM-19", channels: 32 },
+  { id: "CAM-20", channels: 24 },
+  { id: "CAM-21", channels: 12 },
+  { id: "CAM-22", channels: 36 },
+  { id: "CAM-23", channels: 48 },
+  { id: "CAM-24", channels: 24 },
+];
+
+const STATE_INFO = {
+  0: { label: '正常',  color: '#2ea043' },
+  1: { label: '故障',  color: '#da3633' },
+  2: { label: '異常', color: '#e67e22' },   // 原無訊號改為異常
+};
+
+const STORAGE_KEY = 'cctv_v2_state';
+let state = {};          // { "CAM-01": { 1:0, 2:1 ... } }
+let curIdx = 0;
+let curFilter = 'all';
+
+// ---------- 狀態管理 ----------
+function loadState() {
+  try {
+    const raw = localStorage.getItem(STORAGE_KEY);
+    const parsed = raw ? JSON.parse(raw) : {};
+    for (const h of HOSTS) {
+      if (!parsed[h.id]) parsed[h.id] = {};
+      for (let ch = 1; ch <= h.channels; ch++)
+        if (parsed[h.id][ch] === undefined) parsed[h.id][ch] = 0;
+    }
+    state = parsed;
+  } catch { initState(); }
+  saveState();
+}
+
+function initState() {
+  state = {};
+  for (const h of HOSTS) {
+    state[h.id] = {};
+    for (let ch = 1; ch <= h.channels; ch++) state[h.id][ch] = 0;
+  }
+}
+
+function saveState() { localStorage.setItem(STORAGE_KEY, JSON.stringify(state)); }
+
+function hostStats(host) {
+  const s = state[host.id] || {};
+  let normal = 0, fault = 0, abnormal = 0;
+  for (let ch = 1; ch <= host.channels; ch++) {
+    const v = s[ch] ?? 0;
+    if (v === 0) normal++;
+    else if (v === 1) fault++;
+    else abnormal++;
+  }
+  return { normal, fault, abnormal, total: host.channels };
+}
+
+// 獲取故障編號列表 (狀態1) , 異常編號列表 (狀態2)
+function getFaultChannels(hostId) { return getChannelsByState(hostId, 1); }
+function getAbnormalChannels(hostId) { return getChannelsByState(hostId, 2); }
+function getChannelsByState(hostId, targetState) {
+  const hostState = state[hostId] || {};
+  const list = [];
+  for (let ch = 1; ch <= (HOSTS.find(h=>h.id===hostId)?.channels || 0); ch++) {
+    if ((hostState[ch] ?? 0) === targetState) list.push(ch);
+  }
+  return list;
+}
+
+// 更新標頭日期
+function renderHeader() {
+  const d = new Date();
+  const pad = n => String(n).padStart(2, '0');
+  document.getElementById('headerDate').textContent =
+    `${d.getFullYear()}/${pad(d.getMonth()+1)}/${pad(d.getDate())} 週${['日','一','二','三','四','五','六'][d.getDay()]}`;
+}
+
+// 點檢面板渲染
+function renderInspection() {
+  renderHostNav();
+  renderGrid();
+}
+
+function renderHostNav() {
+  const h = HOSTS[curIdx];
+  const st = hostStats(h);
+  document.getElementById('hostName').textContent = h.id;
+  document.getElementById('hostMeta').textContent = `${h.channels} 迴路　${curIdx + 1} / ${HOSTS.length}`;
+  document.getElementById('statNormal').textContent  = st.normal;
+  document.getElementById('statFault').textContent   = st.fault;
+  document.getElementById('statAbnormal').textContent = st.abnormal;
+
+  const dotsEl = document.getElementById('hostDots');
+  dotsEl.innerHTML = '';
+  HOSTS.forEach((hh, i) => {
+    const hs = hostStats(hh);
+    const dot = document.createElement('div');
+    dot.className = 'host-dot';
+    if (i === curIdx) dot.classList.add('current');
+    else if (hs.fault > 0) dot.classList.add('has-fault');
+    else if (hs.abnormal > 0) dot.classList.add('has-abnormal');
+    else dot.classList.add('all-ok');
+    dot.title = hh.id;
+    dot.addEventListener('click', () => { curIdx = i; renderInspection(); });
+    dotsEl.appendChild(dot);
+  });
+}
+
+function renderGrid() {
+  const h = HOSTS[curIdx];
+  const hs = state[h.id];
+  const grid = document.getElementById('chGrid');
+  grid.innerHTML = '';
+  const filterMap = { fault: 1, abnormal: 2, normal: 0, all: -1 };
+  const filterVal = filterMap[curFilter];
+
+  for (let ch = 1; ch <= h.channels; ch++) {
+    const v = hs[ch] !== undefined ? hs[ch] : 0;
+    const card = document.createElement('div');
+    card.className = 'ch-card';
+    card.dataset.state = v;
+    card.dataset.ch = ch;
+    card.textContent = ch;
+    if (filterVal !== -1 && v !== filterVal) card.classList.add('hidden');
+
+    card.addEventListener('click', () => {
+      const next = (parseInt(card.dataset.state) + 1) % 3;
+      card.dataset.state = next;
+      hs[ch] = next;
+      saveState();
+      updateStatsOnly();
+      updateDotsOnly();
+      if (filterVal !== -1 && next !== filterVal) card.classList.add('hidden');
+      else card.classList.remove('hidden');
+    });
+    grid.appendChild(card);
+  }
+}
+
+function updateStatsOnly() {
+  const st = hostStats(HOSTS[curIdx]);
+  document.getElementById('statNormal').textContent = st.normal;
+  document.getElementById('statFault').textContent = st.fault;
+  document.getElementById('statAbnormal').textContent = st.abnormal;
+}
+function updateDotsOnly() {
+  document.querySelectorAll('.host-dot').forEach((dot, i) => {
+    const hs = hostStats(HOSTS[i]);
+    dot.className = 'host-dot';
+    if (i === curIdx) dot.classList.add('current');
+    else if (hs.fault > 0) dot.classList.add('has-fault');
+    else if (hs.abnormal > 0) dot.classList.add('has-abnormal');
+    else dot.classList.add('all-ok');
+  });
+}
+
+// 總覽
+function renderOverview() {
+  let totalNormal = 0, totalFault = 0, totalAbnormal = 0;
+  HOSTS.forEach(h => {
+    const s = hostStats(h);
+    totalNormal += s.normal; totalFault += s.fault; totalAbnormal += s.abnormal;
+  });
+  const grandTotal = totalNormal + totalFault + totalAbnormal;
+
+  document.getElementById('overviewSummary').innerHTML = `
+    <div class="section-label" style="margin-bottom:10px">全場統計</div>
+    <div class="overview-summary-row">
+      <span class="ov-stat"><div class="ov-dot" style="background:var(--normal)"></div>正常 ${totalNormal}</span>
+      <span class="ov-stat"><div class="ov-dot" style="background:var(--fault)"></div>故障 ${totalFault}</span>
+      <span class="ov-stat"><div class="ov-dot" style="background:var(--abnormal)"></div>異常 ${totalAbnormal}</span>
+      <span class="ov-stat" style="color:var(--muted)">共 ${grandTotal} 迴路</span>
+    </div>
+    <div style="height:8px;border-radius:4px;overflow:hidden;background:var(--border);display:flex;margin-top:12px">
+      <div style="width:${(totalNormal/grandTotal*100).toFixed(1)}%;background:var(--normal)"></div>
+      <div style="width:${(totalFault/grandTotal*100).toFixed(1)}%;background:var(--fault)"></div>
+      <div style="width:${(totalAbnormal/grandTotal*100).toFixed(1)}%;background:var(--abnormal)"></div>
+    </div>
+  `;
+
+  const grid = document.getElementById('overviewGrid');
+  grid.innerHTML = '';
+  HOSTS.forEach((h, i) => {
+    const s = hostStats(h);
+    const np = (s.normal   / s.total * 100).toFixed(1);
+    const fp = (s.fault    / s.total * 100).toFixed(1);
+    const ap = (s.abnormal / s.total * 100).toFixed(1);
+    const hasIssue = s.fault > 0 || s.abnormal > 0;
+    const card = document.createElement('div');
+    card.className = 'overview-card' + (hasIssue ? ' has-issue' : '');
+    card.innerHTML = `
+      <div class="ov-host-name">${h.id}</div>
+      <div class="ov-bar">
+        <div class="ov-bar-seg" style="width:${np}%;background:var(--normal)"></div>
+        <div class="ov-bar-seg" style="width:${fp}%;background:var(--fault)"></div>
+        <div class="ov-bar-seg" style="width:${ap}%;background:var(--abnormal)"></div>
+      </div>
+      <div class="ov-counts">
+        <span class="ov-count"><div class="ov-count-dot" style="background:var(--normal)"></div>${s.normal}</span>
+        <span class="ov-count"><div class="ov-count-dot" style="background:var(--fault)"></div>${s.fault}</span>
+        <span class="ov-count"><div class="ov-count-dot" style="background:var(--abnormal)"></div>${s.abnormal}</span>
+        <span style="margin-left:auto">${s.total}CH</span>
+      </div>
+    `;
+    card.addEventListener('click', () => { curIdx = i; switchTab('inspection'); renderInspection(); });
+    grid.appendChild(card);
+  });
+}
+
+// 切換頁籤
+function switchTab(tab) {
+  ['inspection', 'overview'].forEach(t => {
+    document.getElementById(`tab-btn-${t}`).classList.toggle('active', t === tab);
+    document.getElementById(`pane-${t}`).style.display = t === tab ? 'block' : 'none';
+  });
+  if (tab === 'overview') renderOverview();
+}
+
+// 快速全設
+function setAllCurrent(val) {
+  const h = HOSTS[curIdx];
+  const labels = ['正常', '故障', '異常'];
+  for (let ch = 1; ch <= h.channels; ch++) state[h.id][ch] = val;
+  saveState();
+  renderGrid();
+  updateStatsOnly();
+  updateDotsOnly();
+  toast(`${h.id} 已全設為「${labels[val]}」`);
+}
+
+// 匯出主機報表 (每主機一行，故障編號逗號分隔，備註內含異常通道)
+function exportHostSheet() {
+  const rows = [];
+  rows.push(['主機', 'CH總數', '故障編號', '故障數', '正常總數', '備註']);
+  for (const h of HOSTS) {
+    const faultList = getFaultChannels(h.id);
+    const abnormalList = getAbnormalChannels(h.id);
+    const faultStr = faultList.join(',');
+    const faultCount = faultList.length;
+    const abnormalCount = abnormalList.length;
+    const stats = hostStats(h);
+    const normalTotal = stats.total - faultCount - abnormalCount;  // 正常總數 = 總數 - 故障 - 異常
+    
+    let remark = '';
+    if (abnormalList.length > 0) {
+      remark = `異常通道: ${abnormalList.join(',')}；待填寫原因`;
+    } else {
+      remark = '';
+    }
+    rows.push([
+      h.id,
+      stats.total,
+      faultStr,
+      faultCount,
+      normalTotal,
+      remark
+    ]);
+  }
+  // 加總列 (選配)
+  const totalCh = HOSTS.reduce((s,h)=>s+h.channels,0);
+  const totalFaultSum = rows.slice(1).reduce((s,r)=>s+(Number(r[3])||0),0);
+  const totalAbnormalCh = HOSTS.reduce((s,h)=>s+getAbnormalChannels(h.id).length,0);
+  const totalNormalSum = totalCh - totalFaultSum - totalAbnormalCh;
+  rows.push(['全場總計', totalCh, '', totalFaultSum, totalNormalSum, `異常總數:${totalAbnormalCh}`]);
+  
+  const csv = rows.map(r => r.map(cell => `"${String(cell).replace(/"/g, '""')}"`).join(',')).join('\r\n');
+  const blob = new Blob(['\uFEFF' + csv], { type: 'text/csv;charset=utf-8;' });
+  const a = document.createElement('a');
+  const date = new Date();
+  const dateStr = `${date.getFullYear()}-${String(date.getMonth()+1).padStart(2,'0')}-${String(date.getDate()).padStart(2,'0')}`;
+  a.download = `CCTV點檢_主機報表_${dateStr}.csv`;
+  a.href = URL.createObjectURL(blob);
+  document.body.appendChild(a); a.click(); document.body.removeChild(a);
+  URL.revokeObjectURL(a.href);
+  toast('已匯出主機報表 (故障編號+異常備註)');
+}
+
+// 匯出異常清單 (明細: 列出所有故障+異常的通道)
+function exportFaultList() {
+  const rows = [['CCTV 異常清單', `匯出日期: ${new Date().toLocaleString()}`], []];
+  rows.push(['主機ID', '迴路編號', '狀態類型']);
+  let count = 0;
+  for (const h of HOSTS) {
+    const hs = state[h.id] || {};
+    for (let ch = 1; ch <= h.channels; ch++) {
+      const v = hs[ch] ?? 0;
+      if (v === 1) { rows.push([h.id, ch, '故障']); count++; }
+      else if (v === 2) { rows.push([h.id, ch, '異常']); count++; }
+    }
+  }
+  if (count === 0) { toast('目前無故障或異常記錄'); return; }
+  const csv = rows.map(r => r.map(cell => `"${String(cell).replace(/"/g, '""')}"`).join(',')).join('\r\n');
+  const blob = new Blob(['\uFEFF' + csv], { type: 'text/csv;charset=utf-8;' });
+  const a = document.createElement('a');
+  const date = new Date();
+  const dateStr = `${date.getFullYear()}-${String(date.getMonth()+1).padStart(2,'0')}-${String(date.getDate()).padStart(2,'0')}`;
+  a.download = `CCTV_異常清單_${dateStr}.csv`;
+  a.href = URL.createObjectURL(blob);
+  document.body.appendChild(a); a.click(); document.body.removeChild(a);
+  URL.revokeObjectURL(a.href);
+  toast(`已匯出 ${count} 筆異常明細`);
+}
+
+// 輔助與事件綁定
+function toast(msg) {
+  const el = document.getElementById('toast');
+  el.textContent = msg;
+  el.classList.add('show');
+  clearTimeout(el._t);
+  el._t = setTimeout(() => el.classList.remove('show'), 2600);
+}
+
+// 初始化事件
+document.querySelectorAll('.filter-btn').forEach(btn => {
+  btn.addEventListener('click', () => {
+    curFilter = btn.dataset.filter;
+    document.querySelectorAll('.filter-btn').forEach(b => b.classList.remove('active'));
+    btn.classList.add('active');
+    const filterMap = { fault: 1, abnormal: 2, normal: 0, all: -1 };
+    const fv = filterMap[curFilter];
+    document.querySelectorAll('.ch-card').forEach(card => {
+      if (fv === -1) card.classList.remove('hidden');
+      else if (parseInt(card.dataset.state) !== fv) card.classList.add('hidden');
+      else card.classList.remove('hidden');
+    });
+  });
+});
+
+document.getElementById('btnPrev').addEventListener('click', () => {
+  curIdx = (curIdx - 1 + HOSTS.length) % HOSTS.length;
+  renderInspection();
+});
+document.getElementById('btnNext').addEventListener('click', () => {
+  curIdx = (curIdx + 1) % HOSTS.length;
+  renderInspection();
+});
+document.querySelectorAll('.tab').forEach(tab => {
+  tab.addEventListener('click', () => switchTab(tab.dataset.tab));
+});
+document.getElementById('qaAllNormal').addEventListener('click', () => setAllCurrent(0));
+document.getElementById('qaAllFault').addEventListener('click', () => setAllCurrent(1));
+document.getElementById('qaAllAbnormal').addEventListener('click', () => setAllCurrent(2));
+document.getElementById('btnResetCurrent').addEventListener('click', () => {
+  if (confirm(`重置 ${HOSTS[curIdx].id} 為全部正常？`)) setAllCurrent(0);
+});
+document.getElementById('btnResetAll').addEventListener('click', () => {
+  if (confirm('⚠️ 清除所有主機點檢記錄？無法復原。')) { initState(); saveState(); renderInspection(); toast('已重置全部主機'); }
+});
+document.getElementById('btnExportFull').addEventListener('click', () => exportHostSheet());
+document.getElementById('btnExportFault').addEventListener('click', () => exportFaultList());
+
+// 手勢滑動
+let tsx = 0, tsy = 0;
+const gridEl = document.getElementById('chGrid');
+gridEl.addEventListener('touchstart', e => { tsx = e.touches[0].clientX; tsy = e.touches[0].clientY; }, { passive: true });
+gridEl.addEventListener('touchend', e => {
+  const dx = e.changedTouches[0].clientX - tsx;
+  const dy = Math.abs(e.changedTouches[0].clientY - tsy);
+  if (Math.abs(dx) > 65 && dy < 45) {
+    curIdx = dx < 0 ? (curIdx + 1) % HOSTS.length : (curIdx - 1 + HOSTS.length) % HOSTS.length;
+    renderInspection();
+  }
+}, { passive: true });
+
+// 啟動
+loadState();
+renderHeader();
+renderInspection();
+</script>
+</body>
+</html>
