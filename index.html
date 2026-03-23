@@ -2,7 +2,10 @@
 <html lang="zh-Hant">
 <head>
   <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="theme-color" content="#161b22">
   <title>CCTV 點檢系統 | 異常記錄管理</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;600;700&family=Outfit:wght@400;500;600;700;800&display=swap" rel="stylesheet">
@@ -19,24 +22,42 @@
       --fault:     #da3633;
       --abnormal:  #e67e22;
       --removed:   #6e7681;
-      --radius:    18px;
+      --radius:    16px;
+      /* 安全區域 */
+      --safe-top:    env(safe-area-inset-top, 0px);
+      --safe-bottom: env(safe-area-inset-bottom, 0px);
     }
 
-    * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; margin: 0; padding: 0; }
+    /* === 基礎重置 === */
+    *, *::before, *::after {
+      box-sizing: border-box;
+      -webkit-tap-highlight-color: transparent;
+      margin: 0; padding: 0;
+    }
+
+    html {
+      overflow-x: hidden;
+      overscroll-behavior: none;
+    }
 
     body {
       font-family: 'Outfit', system-ui, sans-serif;
       background: var(--bg);
       color: var(--text);
       min-height: 100dvh;
-      padding-bottom: 88px;
+      /* 底部留空：固定 bottom-bar 高度 + 安全區域 */
+      padding-bottom: calc(80px + var(--safe-bottom) + 8px);
+      overflow-x: hidden;
+      overscroll-behavior-y: contain;
+      -webkit-text-size-adjust: 100%; /* 防止iOS旋轉時自動縮放字體 */
     }
 
+    /* === Header === */
     .header {
       background: var(--surface);
       border-bottom: 1px solid var(--border);
-      padding: 14px 18px;
-      padding-top: max(14px, env(safe-area-inset-top));
+      padding: 12px 16px;
+      padding-top: max(12px, var(--safe-top));
       position: sticky; top: 0; z-index: 100;
       display: flex; justify-content: space-between; align-items: center;
     }
@@ -48,114 +69,166 @@
       width: 10px; height: 10px; border-radius: 50%;
       background: var(--fault);
       animation: pulse 1.8s ease-in-out infinite;
+      flex-shrink: 0;
     }
     @keyframes pulse { 0%,100%{opacity:1;transform:scale(1)} 50%{opacity:.5;transform:scale(1.3)} }
     .header-date {
       font-family: 'JetBrains Mono', monospace;
-      font-size: 0.72rem; color: var(--muted);
+      font-size: 0.7rem; color: var(--muted);
+      text-align: right;
     }
 
+    /* === Tab Bar === */
     .tab-bar {
-      display: flex; gap: 0;
+      display: flex;
       background: var(--surface); border-bottom: 1px solid var(--border);
+      position: sticky;
+      /* 緊接在 header 下方 sticky */
+      top: calc(44px + max(12px, var(--safe-top)));
+      z-index: 99;
     }
     .tab {
-      flex: 1; text-align: center; padding: 12px 0;
-      font-weight: 700; font-size: 0.88rem;
+      flex: 1; text-align: center;
+      padding: 0 0; height: 48px;  /* 固定高度 = 明確觸控目標 */
+      display: flex; align-items: center; justify-content: center;
+      font-weight: 700; font-size: 0.9rem;
       cursor: pointer; color: var(--muted);
-      border-bottom: 2px solid transparent;
+      border-bottom: 2.5px solid transparent;
       transition: all .2s; user-select: none;
     }
     .tab.active { color: var(--primary); border-color: var(--primary); }
 
-    .content { padding: 14px 14px 0; max-width: 820px; margin: 0 auto; }
+    /* === 主內容區 === */
+    .content { padding: 12px 12px 0; max-width: 820px; margin: 0 auto; }
 
+    /* === 主機導覽 === */
     .host-nav {
       background: var(--surface);
       border: 1px solid var(--border);
       border-radius: var(--radius);
-      padding: 14px 14px 10px;
+      padding: 12px 12px 10px;
       margin-bottom: 10px;
     }
-    .host-nav-row { display: flex; align-items: center; gap: 10px; margin-bottom: 12px; }
+    .host-nav-row { display: flex; align-items: center; gap: 8px; margin-bottom: 12px; }
+
+    /* 導覽按鈕：明確 44×44 觸控目標 */
     .nav-btn {
-      width: 44px; height: 44px; flex-shrink: 0;
+      width: 48px; height: 48px; flex-shrink: 0;
       background: var(--surface2); border: 1px solid var(--border);
       border-radius: 12px; color: var(--text);
-      font-size: 1rem; cursor: pointer;
+      font-size: 1.1rem; cursor: pointer;
       display: flex; align-items: center; justify-content: center;
-      transition: all .15s; font-family: inherit;
+      transition: background .15s, transform .1s;
+      font-family: inherit;
+      /* 擴大觸控範圍 */
+      touch-action: manipulation;
     }
-    .nav-btn:active { background: var(--border); transform: scale(0.93); }
-    .host-info { flex: 1; text-align: center; }
+    .nav-btn:active { background: var(--border); transform: scale(0.9); }
+
+    .host-info { flex: 1; text-align: center; min-width: 0; }
     .host-name {
-      font-size: 1.5rem; font-weight: 800;
+      font-size: clamp(1.3rem, 6vw, 1.7rem);
+      font-weight: 800;
       font-family: 'JetBrains Mono', monospace;
       letter-spacing: 0.06em; line-height: 1;
     }
     .host-meta { font-size: 0.72rem; color: var(--muted); margin-top: 3px; }
 
-    .host-dots { display: flex; gap: 4px; justify-content: center; flex-wrap: wrap; }
+    /* === 主機指示點 — 增加觸控面積 === */
+    .host-dots {
+      display: flex; gap: 6px; justify-content: center;
+      flex-wrap: wrap;
+      /* 讓每個 dot 有更大的點擊面積 */
+      padding: 4px 0;
+    }
     .host-dot {
-      width: 8px; height: 8px; border-radius: 4px;
+      width: 10px; height: 10px; border-radius: 5px;
       background: var(--border); cursor: pointer;
       transition: all .15s;
+      /* 擴大觸控範圍而不影響視覺大小 */
+      padding: 8px;
+      background-clip: content-box;
+      -webkit-background-clip: content-box;
+      margin: -8px;
+      position: relative;
     }
-    .host-dot.current   { width: 22px; background: var(--primary); }
+    .host-dot.current   { width: 24px; padding: 8px; border-radius: 12px; background: var(--primary); }
     .host-dot.has-fault { background: var(--fault); }
     .host-dot.has-abnormal:not(.has-fault) { background: var(--abnormal); }
-    .host-dot.removed   { background: var(--removed); cursor: default; opacity: 0.6; }
+    .host-dot.removed   { background: var(--removed); cursor: default; opacity: 0.5; }
     .host-dot.all-ok    { background: var(--normal); }
 
+    /* === 統計條 === */
     .stats-strip { display: grid; grid-template-columns: repeat(3,1fr); gap: 8px; margin-bottom: 10px; }
     .stat-card {
       background: var(--surface); border: 1px solid var(--border);
-      border-radius: 14px; padding: 12px 8px; text-align: center;
+      border-radius: 14px; padding: 12px 6px; text-align: center;
     }
     .stat-num {
-      font-size: 1.8rem; font-weight: 800;
+      font-size: clamp(1.4rem, 5vw, 1.9rem);
+      font-weight: 800;
       font-family: 'JetBrains Mono', monospace; line-height: 1;
     }
-    .stat-label { font-size: 0.68rem; color: var(--muted); margin-top: 3px; }
-    .stat-card.s-normal  .stat-num { color: var(--normal); }
-    .stat-card.s-fault   .stat-num { color: var(--fault); }
+    .stat-label { font-size: clamp(0.62rem, 2.2vw, 0.7rem); color: var(--muted); margin-top: 4px; }
+    .stat-card.s-normal   .stat-num { color: var(--normal); }
+    .stat-card.s-fault    .stat-num { color: var(--fault); }
     .stat-card.s-abnormal .stat-num { color: var(--abnormal); }
 
-    .filter-row { display: flex; gap: 6px; margin-bottom: 10px; }
+    /* === 篩選列 — 確保觸控目標高度 >= 40px === */
+    .filter-row { display: flex; gap: 6px; margin-bottom: 10px; flex-wrap: wrap; }
     .filter-btn {
-      flex: 1; padding: 8px 4px;
+      flex: 1; min-width: 60px;
+      padding: 0 4px; height: 42px;
       border-radius: 10px; border: 1px solid var(--border);
       background: var(--surface); font-size: 0.78rem; font-weight: 600;
       color: var(--muted); cursor: pointer; text-align: center;
       transition: all .15s; font-family: inherit;
+      display: flex; align-items: center; justify-content: center;
+      touch-action: manipulation;
     }
     .filter-btn.active { border-color: var(--primary); color: var(--primary); background: rgba(31,111,235,.12); }
     .filter-btn:active { transform: scale(0.95); }
 
+    /* === 圖例 === */
     .legend {
-      display: flex; gap: 14px; justify-content: center;
+      display: flex; gap: 12px; justify-content: center;
       margin-bottom: 10px; flex-wrap: wrap;
     }
     .legend-item { display: flex; align-items: center; gap: 5px; font-size: 0.75rem; color: var(--muted); }
-    .legend-dot { width: 10px; height: 10px; border-radius: 50%; }
+    .legend-dot { width: 10px; height: 10px; border-radius: 50%; flex-shrink: 0; }
 
+    /* 滑動提示 */
+    .swipe-hint {
+      text-align: center;
+      font-size: 0.65rem;
+      color: var(--border);
+      margin-bottom: 6px;
+      letter-spacing: 0.06em;
+    }
+
+    /* === 頻道網格 === */
     .ch-grid {
       background: var(--surface); border: 1px solid var(--border);
-      border-radius: var(--radius); padding: 12px;
+      border-radius: var(--radius); padding: 10px;
       margin-bottom: 10px;
-      min-height: 200px;
+      min-height: 180px;
+      /* 禁止文字選取 */
+      user-select: none;
+      -webkit-user-select: none;
     }
     .grid-normal {
       display: grid;
-      grid-template-columns: repeat(auto-fill, minmax(58px, 1fr));
-      gap: 7px;
+      grid-template-columns: repeat(auto-fill, minmax(54px, 1fr));
+      gap: 6px;
     }
     .ch-card {
       aspect-ratio: 1;
+      min-height: 44px; /* 確保觸控目標 */
       border-radius: 12px;
       display: flex; flex-direction: column;
       align-items: center; justify-content: center;
-      font-weight: 700; font-size: 0.9rem;
+      font-weight: 700;
+      font-size: clamp(0.75rem, 2.8vw, 0.92rem);
       font-family: 'JetBrains Mono', monospace;
       color: white; cursor: pointer;
       user-select: none; touch-action: manipulation;
@@ -166,36 +239,44 @@
     .ch-card[data-state="1"] { background: var(--fault); }
     .ch-card[data-state="2"] { background: var(--abnormal); }
     .ch-card.hidden { display: none; }
-    .ch-card:active { transform: scale(0.87); }
+    .ch-card:active { transform: scale(0.84); }
     .ch-card[data-state="1"]::before {
       content: '';
       position: absolute; inset: 0;
-      background: linear-gradient(135deg, rgba(255,255,255,.12) 0%, transparent 60%);
+      background: linear-gradient(135deg, rgba(255,255,255,.15) 0%, transparent 60%);
       pointer-events: none;
     }
+
     .removed-message {
-      text-align: center;
-      padding: 40px 20px;
-      color: var(--muted);
-      font-size: 0.9rem;
-      background: var(--surface2);
-      border-radius: 12px;
+      text-align: center; padding: 40px 20px;
+      color: var(--muted); font-size: 0.9rem;
+      background: var(--surface2); border-radius: 12px;
       border: 1px dashed var(--border);
     }
 
+    /* === 快速操作區 === */
     .section-label {
       font-size: 0.68rem; font-weight: 700;
       text-transform: uppercase; letter-spacing: .1em;
       color: var(--muted); margin-bottom: 8px;
     }
-    .quick-row { display: flex; gap: 7px; margin-bottom: 7px; }
+    /* 快速全設：3個按鈕排成 1 行，小螢幕自動折行 */
+    .quick-row { display: flex; gap: 7px; margin-bottom: 8px; flex-wrap: wrap; }
+    .quick-row .btn { flex: 1; min-width: 80px; }
+
+    /* === 通用按鈕 === */
     .btn {
-      flex: 1; padding: 11px 8px;
+      flex: 1; padding: 13px 8px;
       border-radius: 12px; border: 1px solid var(--border);
       font-family: 'Outfit', system-ui, sans-serif;
       font-weight: 600; font-size: 0.82rem;
       cursor: pointer; transition: all .15s;
       white-space: nowrap; text-align: center;
+      touch-action: manipulation;
+      /* 確保最小觸控目標高度 */
+      min-height: 46px;
+      display: flex; align-items: center; justify-content: center;
+      line-height: 1.3;
     }
     .btn:active { transform: scale(0.95); }
     .btn-primary  { background: var(--primary); color: white; border-color: var(--primary); }
@@ -204,46 +285,50 @@
     .btn-abnormal { background: rgba(230,126,34,.15); color: #f0a65a; border-color: rgba(230,126,34,.3); }
     .btn-ghost    { background: var(--surface2); color: var(--text); border-color: var(--border); }
     .btn-danger   { background: rgba(218,54,51,.1); color: #f85149; border-color: rgba(218,54,51,.3); }
-    .btn:disabled {
-      opacity: 0.5;
-      cursor: not-allowed;
-      transform: none;
-    }
+    .btn:disabled { opacity: 0.4; cursor: not-allowed; transform: none; pointer-events: none; }
 
+    /* === 底部固定列 === */
     .bottom-bar {
       position: fixed; bottom: 0; left: 0; right: 0;
       background: var(--surface); border-top: 1px solid var(--border);
-      padding: 10px 14px;
-      padding-bottom: max(10px, env(safe-area-inset-bottom));
+      padding: 8px 12px;
+      padding-bottom: max(8px, var(--safe-bottom));
       display: flex; gap: 8px; z-index: 100;
     }
-    .bottom-bar .btn { flex: 1; padding: 13px 8px; font-size: 0.88rem; }
+    .bottom-bar .btn {
+      flex: 1; padding: 12px 6px;
+      font-size: 0.82rem; min-height: 46px;
+      /* 允許換行讓按鈕更緊湊 */
+      white-space: normal; line-height: 1.25;
+    }
 
+    /* === 總覽面板 === */
     .overview-summary {
       background: var(--surface); border: 1px solid var(--border);
       border-radius: var(--radius); padding: 14px; margin-bottom: 12px;
     }
     .overview-summary-row {
-      display: flex; gap: 8px; justify-content: center; flex-wrap: wrap;
+      display: flex; gap: 10px; justify-content: center; flex-wrap: wrap;
     }
     .ov-stat {
       display: flex; align-items: center; gap: 5px;
       font-size: 0.85rem; font-weight: 600;
     }
-    .ov-dot { width: 10px; height: 10px; border-radius: 50%; }
+    .ov-dot { width: 10px; height: 10px; border-radius: 50%; flex-shrink: 0; }
 
     .overview-grid { display: grid; grid-template-columns: repeat(2,1fr); gap: 8px; }
     .overview-card {
       background: var(--surface); border: 1px solid var(--border);
       border-radius: 14px; padding: 12px; cursor: pointer;
-      transition: all .15s;
+      transition: transform .15s, border-color .15s;
+      touch-action: manipulation;
+      /* 確保觸控目標 */
+      min-height: 80px;
     }
-    .overview-card:active { transform: scale(0.97); }
+    .overview-card:active { transform: scale(0.96); }
     .overview-card.has-issue { border-color: rgba(218,54,51,.4); }
-    .overview-card.removed-card {
-      opacity: 0.7;
-      border-color: var(--removed);
-    }
+    .overview-card.removed-card { opacity: 0.7; border-color: var(--removed); }
+
     .ov-host-name {
       font-family: 'JetBrains Mono', monospace;
       font-size: 0.92rem; font-weight: 700; margin-bottom: 6px;
@@ -253,36 +338,78 @@
       background: var(--border); display: flex; margin-bottom: 6px;
     }
     .ov-bar-seg { transition: width .3s ease; }
-    .ov-counts { display: flex; gap: 8px; font-size: 0.7rem; color: var(--muted); }
+    .ov-counts { display: flex; gap: 8px; font-size: 0.7rem; color: var(--muted); align-items: center; }
     .ov-count  { display: flex; align-items: center; gap: 3px; }
-    .ov-count-dot { width: 6px; height: 6px; border-radius: 50%; }
-    .removed-badge {
-      font-size: 0.7rem;
-      color: var(--removed);
-      margin-top: 6px;
-      text-align: center;
-    }
+    .ov-count-dot { width: 6px; height: 6px; border-radius: 50%; flex-shrink: 0; }
+    .removed-badge { font-size: 0.7rem; color: var(--removed); margin-top: 6px; text-align: center; }
 
+    /* === Toast — 移至底部，避免被 header 遮蔽 === */
     .toast {
-      position: fixed; top: 80px; left: 50%;
-      transform: translateX(-50%) translateY(-12px);
+      position: fixed;
+      /* 底部 bottom-bar 高度約 62+safe，再往上 16px */
+      bottom: calc(max(8px, var(--safe-bottom)) + 62px + 16px);
+      left: 50%; transform: translateX(-50%) translateY(12px);
       background: var(--text); color: var(--bg);
-      padding: 9px 20px; border-radius: 30px;
-      font-size: 0.82rem; font-weight: 600;
+      padding: 10px 22px; border-radius: 30px;
+      font-size: 0.84rem; font-weight: 600;
       opacity: 0; transition: all .25s; z-index: 999;
       white-space: nowrap; pointer-events: none;
+      max-width: calc(100vw - 32px);
+      white-space: normal; text-align: center;
+      box-shadow: 0 4px 20px rgba(0,0,0,.5);
     }
     .toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
 
-    @media (max-width: 380px) {
-      .grid-normal { grid-template-columns: repeat(auto-fill, minmax(50px, 1fr)); gap: 5px; }
-      .ch-card { font-size: 0.82rem; border-radius: 10px; }
-      .stat-num { font-size: 1.5rem; }
+    /* === 響應式斷點 === */
+    @media (max-width: 360px) {
+      .grid-normal { grid-template-columns: repeat(auto-fill, minmax(46px, 1fr)); gap: 5px; }
+      .ch-card { font-size: 0.72rem; border-radius: 10px; }
+      .stat-num { font-size: 1.3rem; }
+      .host-name { font-size: 1.25rem; }
+      .btn { font-size: 0.75rem; padding: 11px 4px; }
+      .bottom-bar .btn { font-size: 0.74rem; }
+      .tab { font-size: 0.82rem; }
     }
+
+    @media (min-width: 480px) {
+      .grid-normal { grid-template-columns: repeat(auto-fill, minmax(62px, 1fr)); }
+      .overview-grid { grid-template-columns: repeat(3, 1fr); }
+    }
+
     @media (min-width: 600px) {
-      .overview-grid { grid-template-columns: repeat(3,1fr); }
-      .grid-normal { grid-template-columns: repeat(auto-fill, minmax(66px, 1fr)); }
+      .grid-normal { grid-template-columns: repeat(auto-fill, minmax(68px, 1fr)); }
+      .overview-grid { grid-template-columns: repeat(3, 1fr); }
     }
+
+    /* === 橫向模式 (短螢幕) === */
+    @media (max-height: 500px) and (orientation: landscape) {
+      body { padding-bottom: calc(64px + var(--safe-bottom)); }
+      .header { padding-top: 8px; padding-bottom: 8px; }
+      .tab { height: 40px; font-size: 0.82rem; }
+      .host-nav-row { margin-bottom: 8px; }
+      .stats-strip { margin-bottom: 8px; }
+      .stat-card { padding: 8px 4px; }
+      .bottom-bar { padding-top: 6px; padding-bottom: max(6px, var(--safe-bottom)); }
+      .bottom-bar .btn { min-height: 40px; padding: 8px 6px; font-size: 0.76rem; }
+      .ch-grid { min-height: 120px; }
+    }
+
+    /* === 高對比模式支援 === */
+    @media (prefers-contrast: high) {
+      .ch-card { outline: 2px solid rgba(255,255,255,.3); }
+      .btn { outline: 1px solid var(--border); }
+    }
+
+    /* === 防止長按選取 (iOS) === */
+    .ch-grid, .host-dots, .filter-row, .tab-bar, .bottom-bar {
+      -webkit-user-select: none;
+      user-select: none;
+    }
+
+    /* === 滾動條美化 === */
+    ::-webkit-scrollbar { width: 4px; height: 4px; }
+    ::-webkit-scrollbar-track { background: transparent; }
+    ::-webkit-scrollbar-thumb { background: var(--border); border-radius: 4px; }
   </style>
 </head>
 <body>
@@ -302,18 +429,18 @@
 
 <div class="toast" id="toast"></div>
 
-<!-- 點檢面板 -->
+<!-- ===== 點檢面板 ===== -->
 <div id="pane-inspection" class="content">
   <div class="host-nav">
     <div class="host-nav-row">
-      <button class="nav-btn" id="btnPrev">◀</button>
+      <button class="nav-btn" id="btnPrev" aria-label="上一主機">◀</button>
       <div class="host-info">
         <div class="host-name" id="hostName">--</div>
         <div class="host-meta" id="hostMeta">--</div>
       </div>
-      <button class="nav-btn" id="btnNext">▶</button>
+      <button class="nav-btn" id="btnNext" aria-label="下一主機">▶</button>
     </div>
-    <div class="host-dots" id="hostDots"></div>
+    <div class="host-dots" id="hostDots" role="tablist" aria-label="主機選擇"></div>
   </div>
 
   <div class="stats-strip">
@@ -331,7 +458,7 @@
     </div>
   </div>
 
-  <div class="filter-row">
+  <div class="filter-row" role="group" aria-label="篩選狀態">
     <button class="filter-btn active" data-filter="all">全部</button>
     <button class="filter-btn" data-filter="fault">故障</button>
     <button class="filter-btn" data-filter="abnormal">異常</button>
@@ -342,12 +469,12 @@
     <div class="legend-item"><div class="legend-dot" style="background:var(--normal)"></div>正常</div>
     <div class="legend-item"><div class="legend-dot" style="background:var(--fault)"></div>故障</div>
     <div class="legend-item"><div class="legend-dot" style="background:var(--abnormal)"></div>異常</div>
-    <div class="legend-item" style="color:#484f58;font-size:.7rem">↩ 點擊循環切換</div>
   </div>
+  <div class="swipe-hint">← 左右滑動換主機 →　　點擊迴路循環切換</div>
 
   <div id="chGrid" class="ch-grid"></div>
 
-  <div class="section-label">快速全設</div>
+  <div class="section-label" style="margin-top:4px">快速全設</div>
   <div class="quick-row">
     <button class="btn btn-normal"   id="qaAllNormal">✅ 全正常</button>
     <button class="btn btn-fault"    id="qaAllFault">❌ 全故障</button>
@@ -355,61 +482,59 @@
   </div>
 
   <div class="section-label">重置操作</div>
-  <div class="quick-row">
+  <div class="quick-row" style="margin-bottom: 16px">
     <button class="btn btn-ghost"  id="btnResetCurrent">🔄 重置當前主機</button>
     <button class="btn btn-danger" id="btnResetAll">⚠️ 重置全部</button>
   </div>
 </div>
 
-<!-- 總覽面板 -->
+<!-- ===== 總覽面板 ===== -->
 <div id="pane-overview" class="content" style="display:none">
   <div class="overview-summary" id="overviewSummary"></div>
   <div class="overview-grid" id="overviewGrid"></div>
 </div>
 
+<!-- ===== 底部操作列 ===== -->
 <div class="bottom-bar">
-  <button class="btn btn-ghost"    id="btnExportFault">📋 異常清單</button>
-  <button class="btn btn-primary"  id="btnExportFull">📥 主機報表 (Excel格式)</button>
+  <button class="btn btn-ghost"   id="btnExportFault">📋 異常清單</button>
+  <button class="btn btn-primary" id="btnExportFull">📥 主機報表<br><span style="font-size:.72em;font-weight:400;opacity:.85">Excel 格式</span></button>
 </div>
 
 <script>
-// ======================= 主機設定 - 依照活頁簿修正 C/D/E 總通道數 =======================
-// 依據使用者要求: C應為32(未扣除拆除), D為24(未扣除拆除), E為32(未扣除拆除)
-// 其他主機維持原Excel總數，G/H/I拆除主機保持0通道
+// ========== 主機設定 ==========
 const HOSTS = [
-  { id: "A", channels: 31, removed: false },
-  { id: "B", channels: 32, removed: false },
-  { id: "C", channels: 32, removed: false },   // 原31 → 32 (未扣除拆除通道23)
-  { id: "D", channels: 24, removed: false },   // 原22 → 24 (未扣除拆除通道4)
-  { id: "E", channels: 32, removed: false },   // 原30 → 32 (未扣除拆除通道31)
-  { id: "F", channels: 18, removed: false },
-  { id: "G", channels: 0, removed: true },
-  { id: "H", channels: 0, removed: true },
-  { id: "I", channels: 0, removed: true },
-  { id: "J", channels: 32, removed: false },
+  { id: "A",  channels: 31, removed: false },
+  { id: "B",  channels: 32, removed: false },
+  { id: "C",  channels: 32, removed: false },
+  { id: "D",  channels: 24, removed: false },
+  { id: "E",  channels: 32, removed: false },
+  { id: "F",  channels: 18, removed: false },
+  { id: "G",  channels: 0,  removed: true  },
+  { id: "H",  channels: 0,  removed: true  },
+  { id: "I",  channels: 0,  removed: true  },
+  { id: "J",  channels: 32, removed: false },
   { id: "K1", channels: 20, removed: false },
   { id: "K2", channels: 18, removed: false },
-  { id: "L", channels: 39, removed: false },
-  { id: "M", channels: 59, removed: false },
-  { id: "N", channels: 52, removed: false },
-  { id: "O", channels: 51, removed: false },
-  { id: "P", channels: 40, removed: false },
+  { id: "L",  channels: 39, removed: false },
+  { id: "M",  channels: 59, removed: false },
+  { id: "N",  channels: 52, removed: false },
+  { id: "O",  channels: 51, removed: false },
+  { id: "P",  channels: 40, removed: false },
   { id: "Q1", channels: 16, removed: false },
   { id: "Q2", channels: 25, removed: false },
-  { id: "R", channels: 49, removed: false },
-  { id: "S", channels: 12, removed: false }
+  { id: "R",  channels: 49, removed: false },
+  { id: "S",  channels: 12, removed: false }
 ];
-
-const STATE_INFO = {
-  0: { label: '正常',  color: '#2ea043' },
-  1: { label: '故障',  color: '#da3633' },
-  2: { label: '異常', color: '#e67e22' }
-};
 
 const STORAGE_KEY = 'cctv_excel_v2_state';
 let state = {};
 let curIdx = 0;
 let curFilter = 'all';
+
+// ---------- 觸覺反饋 (iOS/Android) ----------
+function haptic(ms = 8) {
+  try { if (navigator.vibrate) navigator.vibrate(ms); } catch(_) {}
+}
 
 // ---------- 狀態管理 ----------
 function loadState() {
@@ -449,7 +574,7 @@ function hostStats(host) {
   return { normal, fault, abnormal, total: host.channels };
 }
 
-function getFaultChannels(hostId) { return getChannelsByState(hostId, 1); }
+function getFaultChannels(hostId)    { return getChannelsByState(hostId, 1); }
 function getAbnormalChannels(hostId) { return getChannelsByState(hostId, 2); }
 function getChannelsByState(hostId, targetState) {
   const hostState = state[hostId] || {};
@@ -462,6 +587,7 @@ function getChannelsByState(hostId, targetState) {
   return list;
 }
 
+// ---------- 渲染 ----------
 function renderHeader() {
   const d = new Date();
   const pad = n => String(n).padStart(2, '0');
@@ -473,18 +599,8 @@ function renderInspection() {
   renderHostNav();
   renderGrid();
   const currentHost = HOSTS[curIdx];
-  const btns = ['qaAllNormal', 'qaAllFault', 'qaAllAbnormal', 'btnResetCurrent'];
-  btns.forEach(id => {
-    const btn = document.getElementById(id);
-    if (currentHost.removed) {
-      btn.disabled = true;
-      btn.style.opacity = '0.5';
-      btn.style.cursor = 'not-allowed';
-    } else {
-      btn.disabled = false;
-      btn.style.opacity = '';
-      btn.style.cursor = 'pointer';
-    }
+  ['qaAllNormal', 'qaAllFault', 'qaAllAbnormal', 'btnResetCurrent'].forEach(id => {
+    document.getElementById(id).disabled = currentHost.removed;
   });
 }
 
@@ -492,13 +608,11 @@ function renderHostNav() {
   const h = HOSTS[curIdx];
   const st = hostStats(h);
   document.getElementById('hostName').textContent = h.id;
-  if (h.removed) {
-    document.getElementById('hostMeta').textContent = `已拆除 (無迴路)`;
-  } else {
-    document.getElementById('hostMeta').textContent = `${h.channels} 迴路　${curIdx + 1} / ${HOSTS.length}`;
-  }
-  document.getElementById('statNormal').textContent  = st.normal;
-  document.getElementById('statFault').textContent   = st.fault;
+  document.getElementById('hostMeta').textContent = h.removed
+    ? `已拆除 (無迴路)`
+    : `${h.channels} 迴路　${curIdx + 1} / ${HOSTS.length}`;
+  document.getElementById('statNormal').textContent   = st.normal;
+  document.getElementById('statFault').textContent    = st.fault;
   document.getElementById('statAbnormal').textContent = st.abnormal;
 
   const dotsEl = document.getElementById('hostDots');
@@ -507,6 +621,9 @@ function renderHostNav() {
     const hs = hostStats(hh);
     const dot = document.createElement('div');
     dot.className = 'host-dot';
+    dot.setAttribute('role', 'tab');
+    dot.setAttribute('aria-label', hh.id + (hh.removed ? ' 已拆除' : ''));
+    dot.setAttribute('aria-selected', i === curIdx ? 'true' : 'false');
     if (hh.removed) {
       dot.classList.add('removed');
     } else if (i === curIdx) {
@@ -520,7 +637,7 @@ function renderHostNav() {
     }
     dot.title = hh.id + (hh.removed ? ' (已拆除)' : '');
     if (!hh.removed) {
-      dot.addEventListener('click', () => { curIdx = i; renderInspection(); });
+      dot.addEventListener('click', () => { haptic(); curIdx = i; renderInspection(); });
     }
     dotsEl.appendChild(dot);
   });
@@ -530,7 +647,7 @@ function renderGrid() {
   const h = HOSTS[curIdx];
   const grid = document.getElementById('chGrid');
   grid.innerHTML = '';
-  
+
   if (h.removed) {
     const msgDiv = document.createElement('div');
     msgDiv.className = 'removed-message';
@@ -538,14 +655,14 @@ function renderGrid() {
     grid.appendChild(msgDiv);
     return;
   }
-  
+
   const hs = state[h.id];
   const filterMap = { fault: 1, abnormal: 2, normal: 0, all: -1 };
   const filterVal = filterMap[curFilter];
-  
+
   const gridContainer = document.createElement('div');
   gridContainer.className = 'grid-normal';
-  
+
   for (let ch = 1; ch <= h.channels; ch++) {
     const v = hs[ch] !== undefined ? hs[ch] : 0;
     const card = document.createElement('div');
@@ -553,9 +670,12 @@ function renderGrid() {
     card.dataset.state = v;
     card.dataset.ch = ch;
     card.textContent = ch;
+    card.setAttribute('role', 'button');
+    card.setAttribute('aria-label', `迴路 ${ch}`);
     if (filterVal !== -1 && v !== filterVal) card.classList.add('hidden');
-    
+
     card.addEventListener('click', () => {
+      haptic(6);
       const next = (parseInt(card.dataset.state) + 1) % 3;
       card.dataset.state = next;
       hs[ch] = next;
@@ -572,35 +692,32 @@ function renderGrid() {
 
 function updateStatsOnly() {
   const st = hostStats(HOSTS[curIdx]);
-  document.getElementById('statNormal').textContent = st.normal;
-  document.getElementById('statFault').textContent = st.fault;
+  document.getElementById('statNormal').textContent   = st.normal;
+  document.getElementById('statFault').textContent    = st.fault;
   document.getElementById('statAbnormal').textContent = st.abnormal;
 }
+
 function updateDotsOnly() {
   document.querySelectorAll('.host-dot').forEach((dot, i) => {
     const hh = HOSTS[i];
-    if (hh.removed) {
-      dot.className = 'host-dot removed';
-      return;
-    }
+    if (hh.removed) { dot.className = 'host-dot removed'; return; }
     const hs = hostStats(hh);
     dot.className = 'host-dot';
-    if (i === curIdx) dot.classList.add('current');
-    else if (hs.fault > 0) dot.classList.add('has-fault');
-    else if (hs.abnormal > 0) dot.classList.add('has-abnormal');
-    else dot.classList.add('all-ok');
+    if (i === curIdx)        dot.classList.add('current');
+    else if (hs.fault > 0)   dot.classList.add('has-fault');
+    else if (hs.abnormal > 0)dot.classList.add('has-abnormal');
+    else                     dot.classList.add('all-ok');
   });
 }
 
 function renderOverview() {
-  let totalNormal = 0, totalFault = 0, totalAbnormal = 0;
-  let totalCh = 0;
+  let totalNormal = 0, totalFault = 0, totalAbnormal = 0, totalCh = 0;
   HOSTS.forEach(h => {
     const s = hostStats(h);
-    totalNormal += s.normal;
-    totalFault += s.fault;
+    totalNormal   += s.normal;
+    totalFault    += s.fault;
     totalAbnormal += s.abnormal;
-    totalCh += s.total;
+    totalCh       += s.total;
   });
 
   document.getElementById('overviewSummary').innerHTML = `
@@ -612,9 +729,9 @@ function renderOverview() {
       <span class="ov-stat" style="color:var(--muted)">共 ${totalCh} 迴路</span>
     </div>
     <div style="height:8px;border-radius:4px;overflow:hidden;background:var(--border);display:flex;margin-top:12px">
-      <div style="width:${totalCh ? (totalNormal/totalCh*100).toFixed(1) : 0}%;background:var(--normal)"></div>
-      <div style="width:${totalCh ? (totalFault/totalCh*100).toFixed(1) : 0}%;background:var(--fault)"></div>
-      <div style="width:${totalCh ? (totalAbnormal/totalCh*100).toFixed(1) : 0}%;background:var(--abnormal)"></div>
+      <div style="width:${totalCh ? (totalNormal/totalCh*100).toFixed(1) : 0}%;background:var(--normal);transition:width .4s"></div>
+      <div style="width:${totalCh ? (totalFault/totalCh*100).toFixed(1) : 0}%;background:var(--fault);transition:width .4s"></div>
+      <div style="width:${totalCh ? (totalAbnormal/totalCh*100).toFixed(1) : 0}%;background:var(--abnormal);transition:width .4s"></div>
     </div>
   `;
 
@@ -626,14 +743,12 @@ function renderOverview() {
     card.className = 'overview-card';
     if (h.removed) card.classList.add('removed-card');
     else if (s.fault > 0 || s.abnormal > 0) card.classList.add('has-issue');
-    
+
     if (h.removed) {
       card.innerHTML = `
         <div class="ov-host-name">${h.id}</div>
         <div class="removed-badge">🚧 主機已拆除</div>
-        <div class="ov-counts" style="margin-top:6px">
-          <span class="ov-count">迴路數: 0</span>
-        </div>
+        <div class="ov-counts" style="margin-top:6px"><span class="ov-count">迴路數: 0</span></div>
       `;
     } else {
       const np = (s.normal   / s.total * 100).toFixed(1);
@@ -654,90 +769,66 @@ function renderOverview() {
         </div>
       `;
     }
-    card.addEventListener('click', () => { curIdx = i; switchTab('inspection'); renderInspection(); });
+    card.addEventListener('click', () => { haptic(); curIdx = i; switchTab('inspection'); renderInspection(); });
     grid.appendChild(card);
   });
 }
 
 function switchTab(tab) {
   const inspectionPane = document.getElementById('pane-inspection');
-  const overviewPane = document.getElementById('pane-overview');
+  const overviewPane   = document.getElementById('pane-overview');
   const tabs = document.querySelectorAll('.tab');
   if (tab === 'inspection') {
-    tabs[0].classList.add('active');
-    tabs[1].classList.remove('active');
-    inspectionPane.style.display = 'block';
-    overviewPane.style.display = 'none';
+    tabs[0].classList.add('active');    tabs[1].classList.remove('active');
+    inspectionPane.style.display = 'block'; overviewPane.style.display = 'none';
   } else {
-    tabs[0].classList.remove('active');
-    tabs[1].classList.add('active');
-    inspectionPane.style.display = 'none';
-    overviewPane.style.display = 'block';
+    tabs[0].classList.remove('active'); tabs[1].classList.add('active');
+    inspectionPane.style.display = 'none'; overviewPane.style.display = 'block';
     renderOverview();
   }
+  // 切換 tab 後回到頂部
+  window.scrollTo({ top: 0, behavior: 'smooth' });
 }
 
 function setAllCurrent(val) {
   const h = HOSTS[curIdx];
-  if (h.removed) {
-    toast('此主機已拆除，無法設定狀態');
-    return;
-  }
+  if (h.removed) { toast('此主機已拆除，無法設定狀態'); return; }
   const labels = ['正常', '故障', '異常'];
   for (let ch = 1; ch <= h.channels; ch++) state[h.id][ch] = val;
   saveState();
   renderGrid();
   updateStatsOnly();
   updateDotsOnly();
+  haptic(15);
   toast(`${h.id} 已全設為「${labels[val]}」`);
 }
 
+// ---------- 匯出 ----------
 function exportHostSheet() {
-  const rows = [];
-  rows.push(['主機', 'CH總數', '故障編號', '故障數', '正常總數', '備註']);
+  const rows = [['主機', 'CH總數', '故障編號', '故障數', '正常總數', '備註']];
   for (const h of HOSTS) {
-    if (h.removed) {
-      rows.push([h.id, 0, '', 0, 0, '主機拆除']);
-      continue;
-    }
-    const faultList = getFaultChannels(h.id);
+    if (h.removed) { rows.push([h.id, 0, '', 0, 0, '主機拆除']); continue; }
+    const faultList    = getFaultChannels(h.id);
     const abnormalList = getAbnormalChannels(h.id);
-    const faultStr = faultList.join(',');
-    const faultCount = faultList.length;
     const stats = hostStats(h);
-    const normalTotal = stats.total - faultCount - abnormalList.length;
-    let remark = '';
-    if (abnormalList.length > 0) remark = `異常通道: ${abnormalList.join(',')}；待填寫原因`;
     rows.push([
-      h.id,
-      stats.total,
-      faultStr,
-      faultCount,
-      normalTotal,
-      remark
+      h.id, stats.total, faultList.join(','), faultList.length,
+      stats.total - faultList.length - abnormalList.length,
+      abnormalList.length > 0 ? `異常通道: ${abnormalList.join(',')}；待填寫原因` : ''
     ]);
   }
-  const totalCh = HOSTS.reduce((s,h)=>s+h.channels,0);
-  const totalFaultSum = rows.slice(1).filter(r => !isNaN(Number(r[3]))).reduce((s,r)=>s+(Number(r[3])||0),0);
-  const totalAbnormalCh = HOSTS.reduce((s,h)=>s+getAbnormalChannels(h.id).length,0);
-  const totalNormalSum = totalCh - totalFaultSum - totalAbnormalCh;
-  rows.push(['全場總計', totalCh, '', totalFaultSum, totalNormalSum, `異常總數:${totalAbnormalCh}`]);
-  
-  const csv = rows.map(r => r.map(cell => `"${String(cell).replace(/"/g, '""')}"`).join(',')).join('\r\n');
-  const blob = new Blob(['\uFEFF' + csv], { type: 'text/csv;charset=utf-8;' });
-  const a = document.createElement('a');
-  const date = new Date();
-  const dateStr = `${date.getFullYear()}-${String(date.getMonth()+1).padStart(2,'0')}-${String(date.getDate()).padStart(2,'0')}`;
-  a.download = `CCTV點檢_主機報表_${dateStr}.csv`;
-  a.href = URL.createObjectURL(blob);
-  document.body.appendChild(a); a.click(); document.body.removeChild(a);
-  URL.revokeObjectURL(a.href);
-  toast('已匯出主機報表 (故障編號+異常備註)');
+  const totalCh = HOSTS.reduce((s,h)=>s+h.channels, 0);
+  const totalFaultSum    = rows.slice(1).reduce((s,r)=>s+(Number(r[3])||0), 0);
+  const totalAbnormalCh  = HOSTS.reduce((s,h)=>s+getAbnormalChannels(h.id).length, 0);
+  rows.push(['全場總計', totalCh, '', totalFaultSum, totalCh-totalFaultSum-totalAbnormalCh, `異常總數:${totalAbnormalCh}`]);
+
+  downloadCsv(rows, `CCTV點檢_主機報表_${dateStr()}.csv`);
+  toast('已匯出主機報表');
 }
 
 function exportFaultList() {
-  const rows = [['CCTV 異常清單', `匯出日期: ${new Date().toLocaleString()}`], []];
-  rows.push(['主機ID', '迴路編號', '狀態類型']);
+  const rows = [['CCTV 異常清單', `匯出日期: ${new Date().toLocaleString()}`], [],
+                ['主機ID', '迴路編號', '狀態類型']];
   let count = 0;
   for (const h of HOSTS) {
     if (h.removed) continue;
@@ -749,16 +840,23 @@ function exportFaultList() {
     }
   }
   if (count === 0) { toast('目前無故障或異常記錄'); return; }
-  const csv = rows.map(r => r.map(cell => `"${String(cell).replace(/"/g, '""')}"`).join(',')).join('\r\n');
+  downloadCsv(rows, `CCTV_異常清單_${dateStr()}.csv`);
+  toast(`已匯出 ${count} 筆異常明細`);
+}
+
+function downloadCsv(rows, filename) {
+  const csv = rows.map(r => r.map(c => `"${String(c).replace(/"/g,'""')}"`).join(',')).join('\r\n');
   const blob = new Blob(['\uFEFF' + csv], { type: 'text/csv;charset=utf-8;' });
   const a = document.createElement('a');
-  const date = new Date();
-  const dateStr = `${date.getFullYear()}-${String(date.getMonth()+1).padStart(2,'0')}-${String(date.getDate()).padStart(2,'0')}`;
-  a.download = `CCTV_異常清單_${dateStr}.csv`;
   a.href = URL.createObjectURL(blob);
+  a.download = filename;
   document.body.appendChild(a); a.click(); document.body.removeChild(a);
   URL.revokeObjectURL(a.href);
-  toast(`已匯出 ${count} 筆異常明細`);
+}
+
+function dateStr() {
+  const d = new Date();
+  return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
 }
 
 function toast(msg) {
@@ -766,20 +864,19 @@ function toast(msg) {
   el.textContent = msg;
   el.classList.add('show');
   clearTimeout(el._t);
-  el._t = setTimeout(() => el.classList.remove('show'), 2600);
+  el._t = setTimeout(() => el.classList.remove('show'), 2800);
 }
 
-// 事件綁定
+// ---------- 事件綁定 ----------
 document.querySelectorAll('.filter-btn').forEach(btn => {
   btn.addEventListener('click', () => {
+    haptic(6);
     curFilter = btn.dataset.filter;
     document.querySelectorAll('.filter-btn').forEach(b => b.classList.remove('active'));
     btn.classList.add('active');
     const filterMap = { fault: 1, abnormal: 2, normal: 0, all: -1 };
     const fv = filterMap[curFilter];
-    const grid = document.getElementById('chGrid');
-    const cards = grid.querySelectorAll('.ch-card');
-    cards.forEach(card => {
+    document.getElementById('chGrid').querySelectorAll('.ch-card').forEach(card => {
       if (fv === -1) card.classList.remove('hidden');
       else if (parseInt(card.dataset.state) !== fv) card.classList.add('hidden');
       else card.classList.remove('hidden');
@@ -788,47 +885,80 @@ document.querySelectorAll('.filter-btn').forEach(btn => {
 });
 
 document.getElementById('btnPrev').addEventListener('click', () => {
-  curIdx = (curIdx - 1 + HOSTS.length) % HOSTS.length;
-  renderInspection();
+  haptic(); curIdx = (curIdx - 1 + HOSTS.length) % HOSTS.length; renderInspection();
 });
 document.getElementById('btnNext').addEventListener('click', () => {
-  curIdx = (curIdx + 1) % HOSTS.length;
-  renderInspection();
+  haptic(); curIdx = (curIdx + 1) % HOSTS.length; renderInspection();
 });
+
 document.querySelectorAll('.tab').forEach(tab => {
-  tab.addEventListener('click', () => switchTab(tab.dataset.tab));
+  tab.addEventListener('click', () => { haptic(6); switchTab(tab.dataset.tab); });
 });
-document.getElementById('qaAllNormal').addEventListener('click', () => setAllCurrent(0));
-document.getElementById('qaAllFault').addEventListener('click', () => setAllCurrent(1));
+
+document.getElementById('qaAllNormal').addEventListener('click',   () => setAllCurrent(0));
+document.getElementById('qaAllFault').addEventListener('click',    () => setAllCurrent(1));
 document.getElementById('qaAllAbnormal').addEventListener('click', () => setAllCurrent(2));
+
 document.getElementById('btnResetCurrent').addEventListener('click', () => {
   const h = HOSTS[curIdx];
   if (h.removed) { toast('拆除主機無法重置'); return; }
-  if (confirm(`重置 ${h.id} 為全部正常？`)) setAllCurrent(0);
+  if (confirm(`重置 ${h.id} 為全部正常？`)) { haptic(20); setAllCurrent(0); }
 });
 document.getElementById('btnResetAll').addEventListener('click', () => {
-  if (confirm('⚠️ 清除所有主機點檢記錄？無法復原。')) { initState(); saveState(); renderInspection(); toast('已重置全部主機'); }
+  if (confirm('⚠️ 清除所有主機點檢記錄？無法復原。')) {
+    haptic(30); initState(); saveState(); renderInspection(); toast('已重置全部主機');
+  }
 });
-document.getElementById('btnExportFull').addEventListener('click', () => exportHostSheet());
+
+document.getElementById('btnExportFull').addEventListener('click',  () => exportHostSheet());
 document.getElementById('btnExportFault').addEventListener('click', () => exportFaultList());
 
-// 手勢滑動
-let tsx = 0, tsy = 0;
+// ---------- 手勢滑動 (改善版：支援多點觸控保護) ----------
+let tsx = 0, tsy = 0, tActive = false;
 const gridEl = document.getElementById('chGrid');
-gridEl.addEventListener('touchstart', e => { tsx = e.touches[0].clientX; tsy = e.touches[0].clientY; }, { passive: true });
+
+gridEl.addEventListener('touchstart', e => {
+  if (e.touches.length !== 1) { tActive = false; return; }
+  tsx = e.touches[0].clientX;
+  tsy = e.touches[0].clientY;
+  tActive = true;
+}, { passive: true });
+
+gridEl.addEventListener('touchmove', e => {
+  if (!tActive || e.touches.length !== 1) return;
+  const dx = e.touches[0].clientX - tsx;
+  const dy = Math.abs(e.touches[0].clientY - tsy);
+  // 若水平移動大於垂直，阻止頁面縱向滾動，以確保流暢切換
+  if (Math.abs(dx) > dy && Math.abs(dx) > 15) {
+    e.preventDefault();
+  }
+}, { passive: false });
+
 gridEl.addEventListener('touchend', e => {
+  if (!tActive) return;
+  tActive = false;
   const dx = e.changedTouches[0].clientX - tsx;
   const dy = Math.abs(e.changedTouches[0].clientY - tsy);
-  if (Math.abs(dx) > 65 && dy < 45) {
+  if (Math.abs(dx) > 60 && dy < 50) {
+    haptic(8);
     curIdx = dx < 0 ? (curIdx + 1) % HOSTS.length : (curIdx - 1 + HOSTS.length) % HOSTS.length;
     renderInspection();
   }
 }, { passive: true });
 
-// 啟動
+// ---------- 鍵盤左右鍵支援 ----------
+document.addEventListener('keydown', e => {
+  if (e.key === 'ArrowLeft')  { curIdx = (curIdx - 1 + HOSTS.length) % HOSTS.length; renderInspection(); }
+  if (e.key === 'ArrowRight') { curIdx = (curIdx + 1) % HOSTS.length;                renderInspection(); }
+});
+
+// ---------- 初始化 ----------
 loadState();
 renderHeader();
 renderInspection();
+
+// 每分鐘更新日期
+setInterval(renderHeader, 60000);
 </script>
 </body>
 </html>
